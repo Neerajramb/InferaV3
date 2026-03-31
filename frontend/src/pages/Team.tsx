@@ -1,98 +1,88 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { BadgeCheck, Circle, Shield, User, Users } from 'lucide-react';
+import { Circle, Shield } from 'lucide-react';
+
+import api from '../utils/api';
+
+interface TeamMember {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  last_seen: string;
+  online: boolean;
+}
 
 export default function Team() {
-  const members = [
-    { name: 'Aarav Mehta', role: 'Founder', status: 'Online' },
-    { name: 'Nina Kapoor', role: 'HR Lead', status: 'Online' },
-    { name: 'Dev Shah', role: 'Product Manager', status: 'Offline' },
-    { name: 'Riya Sen', role: 'Employee', status: 'Online' },
-    { name: 'Kabir Nair', role: 'Employee', status: 'Offline' },
-    { name: 'Sara Ali', role: 'HR Specialist', status: 'Online' },
-  ];
+  const [members, setMembers] = useState<TeamMember[]>([]);
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: { opacity: 1, transition: { staggerChildren: 0.08 } },
-  };
+  useEffect(() => {
+    const loadMembers = async () => {
+      try {
+        const response = await api.get('/team/');
+        const payload = Array.isArray(response.data) ? response.data : response.data.results ?? [];
+        setMembers(payload);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    void loadMembers();
+  }, []);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto space-y-6">
-      
-      {/* HEADER */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-            Team Management
-          </h1>
-          <p className="mt-1 text-gray-500 dark:text-gray-400">
-            Founder and HR visibility across people, access, and status.
-          </p>
-        </div>
-
-        <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] px-4 py-2 text-sm text-gray-600 dark:text-gray-300 shadow-sm backdrop-blur-md">
-          <Users className="w-4 h-4" />
-          6 active profiles
-        </div>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">Team</h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          Visibility into roles, presence, and availability across the workspace.
+        </p>
       </div>
 
-      {/* CARDS */}
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
-      >
-        {members.map((member) => (
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {members.map((member, index) => (
           <motion.div
-            key={member.name}
-            variants={{ hidden: { opacity: 0, y: 18 }, show: { opacity: 1, y: 0 } }}
-            className="rounded-[28px] border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-md"
+            key={member.id}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+            className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-sm dark:border-[#2C2C2E] dark:bg-[#1C1C1E] dark:shadow-none"
           >
-            {/* TOP */}
             <div className="flex items-start justify-between">
-              <div className="w-14 h-14 rounded-[20px] bg-[#F5F5F7] dark:bg-[#2A2A2C] border border-gray-200 dark:border-[#2C2C2E] flex items-center justify-center">
-                <User className="w-6 h-6 text-gray-700 dark:text-gray-200" />
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {member.first_name || member.last_name ? `${member.first_name} ${member.last_name}`.trim() : member.username}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{member.email || member.username}</p>
               </div>
-
-              <div
+              <span
                 className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${
-                  member.status === 'Online'
-                    ? 'bg-green-50 text-green-700 dark:bg-green-500/10 dark:text-green-300'
-                    : 'bg-gray-100 text-gray-600 dark:bg-[#2A2A2C] dark:text-gray-400'
+                  member.online
+                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300'
+                    : 'bg-gray-100 text-gray-600 dark:bg-[#000000] dark:text-gray-400'
                 }`}
               >
-                <Circle className="w-3 h-3 fill-current" />
-                {member.status}
-              </div>
+                <Circle className="h-3 w-3 fill-current" />
+                {member.online ? 'Online' : 'Offline'}
+              </span>
             </div>
 
-            {/* INFO */}
-            <div className="mt-5">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {member.name}
-              </h3>
-
-              <div className="mt-2 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <Shield className="w-4 h-4" />
+            <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#2C2C2E] dark:bg-[#000000]">
+              <p className="text-xs uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">Role</p>
+              <div className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white">
+                <Shield className="h-4 w-4" />
                 {member.role}
               </div>
             </div>
 
-            {/* FOOTER */}
-            <div className="mt-5 flex items-center justify-between rounded-2xl border border-gray-200 dark:border-[#2C2C2E] bg-[#F9F9FB] dark:bg-[#161618] px-4 py-3">
-              <span className="text-sm text-gray-500 dark:text-gray-400">
-                Security clearance
-              </span>
-
-              <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-900 dark:text-white">
-                <BadgeCheck className="w-4 h-4" />
-                Verified
-              </span>
-            </div>
+            <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              Last seen {new Date(member.last_seen).toLocaleString()}
+            </p>
           </motion.div>
         ))}
-      </motion.div>
+      </div>
     </motion.div>
   );
 }

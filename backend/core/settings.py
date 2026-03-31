@@ -94,12 +94,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = "accounts.User"
 
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
+    "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": (
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
-    ),
+    ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
@@ -126,3 +126,5 @@ EMBEDDING_MODEL_NAME = env("EMBEDDING_MODEL_NAME", "sentence-transformers/all-Mi
 LLM_PROVIDER = env("LLM_PROVIDER", "placeholder")
 OPENAI_API_KEY = env("OPENAI_API_KEY", "")
 GEMINI_API_KEY = env("GEMINI_API_KEY", "")
+OLLAMA_URL = env("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
+OLLAMA_MODEL = env("OLLAMA_MODEL", "mistral")

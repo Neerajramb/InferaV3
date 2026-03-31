@@ -1,90 +1,71 @@
-import { useState } from "react";
-import api from "../utils/api";
+import { useEffect, useState } from 'react';
+import ChatWindow from '../components/ChatWindow';
+import type { FolderNode } from '../components/FolderTree';
+import api from '../utils/api';
 
-interface Message {
-  role: "user" | "ai";
-  text: string;
+interface OptionItem {
+  id: number;
+  title: string;
+}
+
+interface ProjectItem {
+  id: number;
+  name: string;
 }
 
 export default function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [folders, setFolders] = useState<FolderNode[]>([]);
+  const [documents, setDocuments] = useState<OptionItem[]>([]);
+  const [notes, setNotes] = useState<OptionItem[]>([]);
+  const [projects, setProjects] = useState<OptionItem[]>([]);
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const [folderRes, documentRes, noteRes, projectRes] = await Promise.all([
+          api.get('/folders/tree/'),
+          api.get('/documents/'),
+          api.get('/notes/'),
+          api.get('/projects/'),
+        ]);
 
-    const userMessage: Message = { role: "user", text: input };
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
+        const documentPayload = Array.isArray(documentRes.data) ? documentRes.data : documentRes.data.results ?? [];
+        const notePayload = Array.isArray(noteRes.data) ? noteRes.data : noteRes.data.results ?? [];
+        const projectPayload = Array.isArray(projectRes.data) ? projectRes.data : projectRes.data.results ?? [];
 
-    try {
-      const res = await api.post("/chat/", {
-        query: input,
-      });
+        setFolders(folderRes.data);
+        setDocuments(documentPayload.map((item: { id: number; title: string }) => ({ id: item.id, title: item.title })));
+        setNotes(notePayload.map((item: { id: number; title: string }) => ({ id: item.id, title: item.title })));
+        setProjects(projectPayload.map((item: ProjectItem) => ({ id: item.id, title: item.name })));
+      } catch (error) {
+        console.error(error);
+      }
+    };
 
-      const aiMessage: Message = {
-        role: "ai",
-        text: res.data.response,
-      };
-
-      setMessages((prev) => [...prev, aiMessage]);
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", text: "Error getting response ❌" },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    void loadFilters();
+  }, []);
 
   return (
-  <div className="flex flex-col min-h-screen max-w-4xl mx-auto text-black">
-
-    <h1 className="text-2xl font-bold p-4">
-      AI Chat
-    </h1>
-
-    {/* MESSAGES */}
-    <div className="flex-1 overflow-y-auto space-y-4 p-4">
-      {messages.map((msg, index) => (
-        <div
-          key={index}
-          className={`p-3 rounded-lg max-w-xl ${
-            msg.role === "user"
-              ? "bg-black text-white ml-auto"
-              : "bg-gray-200 text-black"
-          }`}
-        >
-          {msg.text}
-        </div>
-      ))}
-
-      {loading && (
-        <div className="text-gray-500 text-sm">Thinking...</div>
-      )}
+    /**
+     * 🛠️ THE ABSOLUTE LOCKDOWN FIX:
+     * We use a relative container with a fixed height.
+     * We then use an absolute inner container to force the ChatWindow to occupy 
+     * the exact space between the top bar and the bottom of the screen.
+     */
+    <div className="relative h-[calc(100vh-170px)] w-full overflow-hidden bg-gray-50/30 rounded-3xl border border-gray-100">
+      <div className="absolute inset-0 flex flex-col min-h-0">
+        <ChatWindow
+          folders={folders}
+          documents={documents}
+          notes={notes}
+          projects={projects}
+        />
+      </div>
+      
+      {/* Absolute Branding Overlay */}
+      <div className="absolute bottom-3 right-8 opacity-40 pointer-events-none select-none">
+         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-gray-400 italic">Infera Intel Engine</p>
+      </div>
     </div>
-
-    {/* INPUT */}
-    <div className="p-4 border-t flex gap-2">
-      <input
-        className="flex-1 border p-2 rounded text-black"
-        placeholder="Ask something..."
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-      />
-
-      <button
-        onClick={sendMessage}
-        className="bg-black text-white px-4 rounded"
-      >
-        Send
-      </button>
-    </div>
-  </div>
-);
+  );
 }

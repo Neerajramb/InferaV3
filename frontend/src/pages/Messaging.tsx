@@ -1,92 +1,155 @@
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Circle, MessageSquare, Paperclip, Search, SendHorizonal } from 'lucide-react';
+import { SendHorizonal, User, ShieldCheck } from 'lucide-react';
+import api from '../utils/api';
 
 export default function Messaging() {
-  const contacts = [
-    { name: 'Nina Kapoor', role: 'HR Lead', status: 'Online' },
-    { name: 'Dev Shah', role: 'Product Manager', status: 'Typing…' },
-    { name: 'Sara Ali', role: 'HR Specialist', status: 'Away' },
-    { name: 'Aarav Mehta', role: 'Founder', status: 'Offline' },
-  ];
+  const [members, setMembers] = useState<any[]>([]);
+  const [activeMemberId, setActiveMemberId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const loadData = async () => {
+    try {
+      const res = await api.get('/team/');
+      const data = Array.isArray(res.data) ? res.data : res.data.results ?? [];
+      setMembers(data);
+      if (data.length > 0 && !activeMemberId) setActiveMemberId(data[0].id);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const loadMessages = async () => {
+    if (!activeMemberId) return;
+    try {
+      const res = await api.get(`/messages/?user_id=${activeMemberId}`);
+      setMessages(Array.isArray(res.data) ? res.data : res.data.results ?? []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => { void loadData(); }, []);
+
+  // 🔥 THE FIX: Polling interval for live chat
+  useEffect(() => { 
+    if (!activeMemberId) return;
+    
+    // Initial load when user is selected
+    void loadMessages(); 
+    
+    // Set up silent background check every 3 seconds
+    const intervalId = setInterval(() => {
+      void loadMessages();
+    }, 3000);
+
+    // Clean up interval when you click a different user or leave the page
+    return () => clearInterval(intervalId);
+  }, [activeMemberId]);
+  
+  // Auto-scroll to bottom
+  useEffect(() => { 
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; 
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !activeMemberId) return;
+    try {
+      await api.post('/messages/', { receiver_id: activeMemberId, content: input });
+      setInput('');
+      await loadMessages(); // Fetch immediately so sender sees it instantly
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Real-time Messaging</h1>
-        <p className="mt-1 text-gray-500 dark:text-gray-400">A polished split layout for people, presence, and conversation.</p>
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      className="grid h-[calc(100vh-140px)] grid-cols-1 gap-6 xl:grid-cols-[320px_1fr] overflow-hidden"
+    >
+      {/* LEFT: TEAMMATES LIST */}
+      <div className="flex flex-col rounded-[35px] border border-gray-100 bg-white p-6 shadow-sm dark:bg-[#1C1C1E]">
+        <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl font-black italic uppercase tracking-tighter">Operatives</h1>
+            <ShieldCheck size={16} className="text-gray-300" />
+        </div>
+        <div className="space-y-2 overflow-y-auto pr-2">
+          {members.map(m => (
+            <button 
+              key={m.id} 
+              onClick={() => setActiveMemberId(m.id)} 
+              className={`flex w-full items-center gap-4 rounded-[20px] p-4 transition-all ${
+                activeMemberId === m.id 
+                ? 'bg-black text-white shadow-lg' 
+                : 'hover:bg-gray-50 text-gray-500'
+              }`}
+            >
+              <div className={`p-2 rounded-lg ${activeMemberId === m.id ? 'bg-white/10' : 'bg-gray-100'}`}>
+                <User size={18} />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-black uppercase tracking-tight">{m.username}</p>
+                <p className={`text-[9px] font-bold uppercase opacity-50 ${activeMemberId === m.id ? 'text-white' : 'text-gray-400'}`}>
+                  {m.role}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
-        <div className="rounded-[30px] border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] p-5 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-md">
-          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 dark:border-[#2C2C2E] bg-[#F9F9FB] dark:bg-[#161618] px-4 py-3 mb-5">
-            <Search className="w-4 h-4 text-gray-400" />
-            <span className="text-sm text-gray-500 dark:text-gray-400">Search people</span>
-          </div>
+      {/* RIGHT: CHAT AREA */}
+      <div className="flex flex-col rounded-[35px] border border-gray-100 bg-white shadow-sm overflow-hidden dark:bg-[#1C1C1E]">
+        {/* MESSAGES LIST */}
+        <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto p-8 scroll-smooth">
+          {messages.length > 0 ? messages.map(msg => {
+            const isMe = msg.sender.id !== activeMemberId;
 
-          <div className="space-y-3">
-            {contacts.map((contact, index) => (
-              <motion.div
-                key={contact.name}
-                initial={{ opacity: 0, x: -14 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.06 }}
-                className={`rounded-2xl border px-4 py-3 ${
-                  index === 1
-                    ? 'border-gray-900 dark:border-white bg-black text-white dark:bg-white dark:text-black'
-                    : 'border-gray-200 dark:border-[#2C2C2E] bg-[#F9F9FB] dark:bg-[#161618]'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{contact.name}</p>
-                    <p className={`text-sm ${index === 1 ? 'text-white/70 dark:text-black/70' : 'text-gray-500 dark:text-gray-400'}`}>
-                      {contact.role}
-                    </p>
+            return (
+              <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[75%] space-y-1 ${isMe ? 'items-end' : 'items-start'}`}>
+                  <div className={`rounded-[22px] px-5 py-3 text-sm font-medium shadow-sm ${
+                    isMe 
+                    ? 'bg-black text-white rounded-br-none' 
+                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                  }`}>
+                    {msg.content}
                   </div>
-                  <div className="inline-flex items-center gap-1 text-xs">
-                    <Circle className="w-3 h-3 fill-current" />
-                    {contact.status}
-                  </div>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-300 px-2">
+                    {isMe ? 'Sent' : 'Received'}
+                  </p>
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              </div>
+            );
+          }) : (
+            <div className="flex h-full items-center justify-center text-gray-300 italic text-sm">
+                No communications found. Start the debrief.
+            </div>
+          )}
         </div>
 
-        <div className="rounded-[30px] border border-gray-200 dark:border-[#2C2C2E] bg-white dark:bg-[#1C1C1E] p-6 shadow-[0_14px_34px_rgba(15,23,42,0.06)] dark:shadow-[0_18px_40px_rgba(0,0,0,0.35)] backdrop-blur-md flex flex-col min-h-[640px]">
-          <div className="border-b border-gray-200 dark:border-[#2C2C2E] pb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#F5F5F7] dark:bg-[#2A2A2C] border border-gray-200 dark:border-[#2C2C2E] flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-gray-700 dark:text-gray-200" />
-              </div>
-              <div>
-                <h2 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">Dev Shah</h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Typing a secure update…</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-[#F5F5F7] dark:bg-[#2A2A2C] border border-gray-200 dark:border-[#2C2C2E] flex items-center justify-center mx-auto">
-                <MessageSquare className="w-6 h-6 text-gray-700 dark:text-gray-200" />
-              </div>
-              <h3 className="mt-5 text-xl font-semibold text-gray-900 dark:text-white">Select a conversation</h3>
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-md">
-                Start a secure conversation, share notes, or send project documents from the protected workspace.
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-5 border-t border-gray-200 dark:border-[#2C2C2E]">
-            <div className="rounded-[24px] border border-gray-200 dark:border-[#2C2C2E] bg-[#F9F9FB] dark:bg-[#161618] px-4 py-3 flex items-center gap-3">
-              <Paperclip className="w-4 h-4 text-gray-400" />
-              <span className="flex-1 text-sm text-gray-500 dark:text-gray-400">Write a message</span>
-              <button className="w-10 h-10 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex items-center justify-center">
-                <SendHorizonal className="w-4 h-4" />
+        {/* INPUT BAR */}
+        <div className="p-6 border-t border-gray-50">
+            <div className="flex gap-3 bg-gray-50 rounded-[22px] p-2 pr-3 items-center border border-gray-100">
+              <input 
+                value={input} 
+                onChange={(e) => setInput(e.target.value)} 
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
+                placeholder="Secure transmission..." 
+                className="flex-1 bg-transparent px-5 py-2 text-sm outline-none font-medium" 
+              />
+              <button 
+                onClick={handleSend} 
+                disabled={!input.trim()}
+                className="rounded-xl bg-black p-3 text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-20"
+              >
+                <SendHorizonal size={20} />
               </button>
             </div>
-          </div>
         </div>
       </div>
     </motion.div>
