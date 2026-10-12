@@ -1,9 +1,24 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RBAC Workspace</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Infera</title>
+    <meta name="description" content="Infera is a self-hosted knowledge workspace. Ask questions across your team's documents and get cited answers, scoped to each person's access." />
+    <meta name="theme-color" content="#0b0c0e" />
+    <meta property="og:title" content="Infera" />
+    <meta property="og:description" content="Ask your documents. Keep them on your network." />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var pref = localStorage.getItem('infera-theme') || 'system'
+          var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

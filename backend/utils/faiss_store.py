@@ -1,132 +1,142 @@
+"""A small persistent vector store backed by NumPy files and FAISS search.
+
+All chunks live in one namespace. Access control happens at query time:
+callers pass the set of (entity_type, entity_id) keys the user may read, so
+stale payload metadata can never leak a document.
+"""
 from __future__ import annotations
 
 import json
+import logging
+import threading
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from django.conf import settings
 
+logger = logging.getLogger("infera.vectors")
 
-PayloadFilter = Callable[[dict[str, Any]], bool]
+EntityKey = tuple[str, int]
+DEFAULT_NAMESPACE = "workspace"
 
 
-class FAISSVectorStore:
-    def __init__(self, storage_root: Path | None = None):
+def entity_key(payload: dict[str, Any]) -> EntityKey:
+    return payload["entity_type"], int(payload["entity_id"])
+
+
+class VectorStore:
+    def __init__(self, storage_root: Path | None = None, namespace: str = DEFAULT_NAMESPACE):
         self.storage_root = Path(storage_root or settings.RAG_STORAGE_ROOT)
+        self.namespace = namespace
+        self._vectors: np.ndarray | None = None
+        self._payloads: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
+
+    @property
+    def _vector_path(self) -> Path:
+        return self.storage_root / f"{self.namespace}.vectors.npy"
+
+    @property
+    def _payload_path(self) -> Path:
+        return self.storage_root / f"{self.namespace}.payloads.json"
+
+    def _ensure_loaded(self) -> None:
+        if self._vectors is not None:
+            return
         self.storage_root.mkdir(parents=True, exist_ok=True)
-        self._cache: dict[str, tuple[np.ndarray, list[dict[str, Any]]]] = {}
+        if self._vector_path.exists() and self._payload_path.exists():
+            vectors = np.load(self._vector_path)
+            payloads = json.loads(self._payload_path.read_text(encoding="utf-8"))
+            if len(payloads) == len(vectors):
+                self._vectors = np.asarray(vectors, dtype=np.float32)
+                self._payloads = payloads
+                return
+            logger.warning("Vector store files are out of sync; starting empty. Run `manage.py reindex`.")
+        self._vectors = np.zeros((0, 0), dtype=np.float32)
+        self._payloads = []
 
-    def _paths(self, namespace: str) -> dict[str, Path]:
-        safe = namespace.replace("/", "_")
-        return {
-            "vectors": self.storage_root / f"{safe}.vectors.npy",
-            "payloads": self.storage_root / f"{safe}.payloads.json",
-        }
+    def _save(self) -> None:
+        assert self._vectors is not None
+        np.save(self._vector_path, self._vectors.astype(np.float32))
+        tmp = self._payload_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self._payloads, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(self._payload_path)
 
-    def _load(self, namespace: str) -> tuple[np.ndarray, list[dict[str, Any]]]:
-        if namespace in self._cache:
-            return self._cache[namespace]
+    def reload(self) -> None:
+        with self._lock:
+            self._vectors = None
+            self._ensure_loaded()
 
-        paths = self._paths(namespace)
-        if not paths["vectors"].exists() or not paths["payloads"].exists():
-            result = (np.zeros((0, 0), dtype=np.float32), [])
-            self._cache[namespace] = result
-            return result
+    def count(self) -> int:
+        with self._lock:
+            self._ensure_loaded()
+            return len(self._payloads)
 
-        vectors = np.load(paths["vectors"])
-        payloads = json.loads(paths["payloads"].read_text(encoding="utf-8"))
-        result = (np.asarray(vectors, dtype=np.float32), payloads)
-        self._cache[namespace] = result
-        return result
+    def clear(self) -> None:
+        with self._lock:
+            self._vectors = np.zeros((0, 0), dtype=np.float32)
+            self._payloads = []
+            self._save()
 
-    def _save(self, namespace: str, vectors: np.ndarray, payloads: list[dict[str, Any]]) -> None:
-        paths = self._paths(namespace)
-        np.save(paths["vectors"], vectors.astype(np.float32))
-        paths["payloads"].write_text(json.dumps(payloads, ensure_ascii=True), encoding="utf-8")
-        self._cache[namespace] = (vectors.astype(np.float32), payloads)
+    def remove_entity(self, entity_type: str, entity_id: int, *, save: bool = True) -> int:
+        with self._lock:
+            self._ensure_loaded()
+            target = (entity_type, int(entity_id))
+            keep = [i for i, payload in enumerate(self._payloads) if entity_key(payload) != target]
+            removed = len(self._payloads) - len(keep)
+            if removed:
+                self._payloads = [self._payloads[i] for i in keep]
+                self._vectors = self._vectors[keep] if keep else np.zeros((0, 0), dtype=np.float32)
+                if save:
+                    self._save()
+            return removed
 
-    def add_embeddings(self, namespace: str, vectors: np.ndarray, payloads: list[dict[str, Any]]) -> None:
+    def replace_entity(self, entity_type: str, entity_id: int, vectors: np.ndarray, payloads: list[dict[str, Any]]) -> None:
         vectors = np.asarray(vectors, dtype=np.float32)
-        existing_vectors, existing_payloads = self._load(namespace)
-        if existing_vectors.size == 0:
-            combined_vectors = vectors
-        elif existing_vectors.shape[1] == vectors.shape[1]:
-            combined_vectors = np.vstack([existing_vectors, vectors])
-        else:
-            combined_vectors = vectors
-            existing_payloads = []
-        combined_payloads = [*existing_payloads, *payloads]
-        self._save(namespace, combined_vectors, combined_payloads)
+        with self._lock:
+            self.remove_entity(entity_type, entity_id, save=False)
+            if len(payloads):
+                if self._vectors.size == 0:
+                    self._vectors = vectors
+                elif self._vectors.shape[1] != vectors.shape[1]:
+                    raise ValueError(
+                        f"Embedding size changed ({self._vectors.shape[1]} -> {vectors.shape[1]}). Run `manage.py reindex`."
+                    )
+                else:
+                    self._vectors = np.vstack([self._vectors, vectors])
+                self._payloads.extend(payloads)
+            self._save()
 
-    def remove_where(self, namespace: str, predicate: PayloadFilter) -> None:
-        vectors, payloads = self._load(namespace)
-        if not payloads:
-            return
-
-        keep_indices = [index for index, payload in enumerate(payloads) if not predicate(payload)]
-        if len(keep_indices) == len(payloads):
-            return
-
-        if not keep_indices:
-            self._save(namespace, np.zeros((0, 0), dtype=np.float32), [])
-            return
-
-        filtered_vectors = vectors[keep_indices] if vectors.size else np.zeros((0, 0), dtype=np.float32)
-        filtered_payloads = [payloads[index] for index in keep_indices]
-        self._save(namespace, filtered_vectors, filtered_payloads)
-
-    def remove_document(self, namespace: str, document_id: int) -> None:
-        self.remove_where(namespace, lambda payload: payload.get("document_id") == document_id)
-
-    def remove_note(self, namespace: str, note_id: int) -> None:
-        self.remove_where(namespace, lambda payload: payload.get("note_id") == note_id)
-
-    def search(
-        self,
-        namespace: str,
-        query_vector: np.ndarray,
-        top_k: int = 5,
-        payload_filter: PayloadFilter | None = None,
-    ) -> list[dict[str, Any]]:
-        vectors, payloads = self._load(namespace)
-        if vectors.size == 0 or not payloads:
-            return []
-
-        active_indices = list(range(len(payloads)))
-        if payload_filter is not None:
-            active_indices = [index for index, payload in enumerate(payloads) if payload_filter(payload)]
-            if not active_indices:
+    def search(self, query_vector: np.ndarray, allowed: set[EntityKey], top_k: int) -> list[dict[str, Any]]:
+        with self._lock:
+            self._ensure_loaded()
+            if not allowed or self._vectors.size == 0:
                 return []
-            vectors = vectors[active_indices]
-            payloads = [payloads[index] for index in active_indices]
+            indices = [i for i, payload in enumerate(self._payloads) if entity_key(payload) in allowed]
+            if not indices:
+                return []
+            subset = self._vectors[indices]
+            payloads = [self._payloads[i] for i in indices]
 
         query = np.asarray(query_vector, dtype=np.float32).reshape(1, -1)
+        if query.shape[1] != subset.shape[1]:
+            logger.warning("Query embedding size does not match the index. Run `manage.py reindex`.")
+            return []
         limit = min(top_k, len(payloads))
-
         try:
             import faiss
 
-            index = faiss.IndexFlatIP(vectors.shape[1])
-            index.add(vectors.astype(np.float32))
-            scores, indices = index.search(query.astype(np.float32), limit)
-            ranked: list[dict[str, Any]] = []
-            for score, idx in zip(scores[0], indices[0]):
-                if idx < 0:
-                    continue
-                item = dict(payloads[idx])
-                item["score"] = float(score)
-                ranked.append(item)
-            return ranked
+            index = faiss.IndexFlatIP(subset.shape[1])
+            index.add(subset)
+            scores, order = index.search(query, limit)
+            pairs = [(int(i), float(s)) for i, s in zip(order[0], scores[0]) if i >= 0]
         except Exception:
-            similarities = vectors @ query.T
-            order = np.argsort(similarities[:, 0])[::-1][:limit]
-            ranked = []
-            for idx in order:
-                item = dict(payloads[int(idx)])
-                item["score"] = float(similarities[int(idx), 0])
-                ranked.append(item)
-            return ranked
+            similarities = (subset @ query.T)[:, 0]
+            top = np.argsort(similarities)[::-1][:limit]
+            pairs = [(int(i), float(similarities[i])) for i in top]
+
+        return [{**payloads[i], "score": score} for i, score in pairs]
 
 
-faiss_store = FAISSVectorStore()
+vector_store = VectorStore()

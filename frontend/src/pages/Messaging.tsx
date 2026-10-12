@@ -1,157 +1,207 @@
-import { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { SendHorizonal, User, ShieldCheck } from 'lucide-react';
-import api from '../utils/api';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'motion/react'
+import { ArrowLeftIcon, ArrowUpIcon, ChatsCircleIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { toast } from 'sonner'
+
+import { Avatar } from '../components/ui/Avatar'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Input } from '../components/ui/Field'
+import { SkeletonRows } from '../components/ui/Skeleton'
+import { keys, useConversations, useTeam, useThread } from '../hooks/queries'
+import { api, errorMessage } from '../lib/api'
+import { cn, dayLabel, formatTime, relativeTime } from '../lib/format'
+import type { DirectMessage } from '../lib/types'
+import { useAuth } from '../store/auth'
 
 export default function Messaging() {
-  const [members, setMembers] = useState<any[]>([]);
-  const [activeMemberId, setActiveMemberId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [input, setInput] = useState('');
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const me = useAuth((s) => s.user)!
+  const [params, setParams] = useSearchParams()
+  const userParam = params.get('user')
+  const activeId = userParam && /^\d+$/.test(userParam) ? Number(userParam) : null
+  const queryClient = useQueryClient()
+  const { data: team = [], isLoading: teamLoading } = useTeam()
+  const { data: conversations = [] } = useConversations()
+  const thread = useThread(activeId)
+  const [filter, setFilter] = useState('')
+  const [draft, setDraft] = useState('')
+  const [pending, setPending] = useState<DirectMessage[]>([])
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-  const loadData = async () => {
-    try {
-      const res = await api.get('/team/');
-      const data = Array.isArray(res.data) ? res.data : res.data.results ?? [];
-      setMembers(data);
-      if (data.length > 0 && !activeMemberId) setActiveMemberId(data[0].id);
-    } catch (e) {
-      console.error(e);
+  const people = useMemo(() => {
+    const byId = new Map(conversations.map((c) => [c.user_id, c]))
+    const q = filter.trim().toLowerCase()
+    return team
+      .filter((u) => u.id !== me.id && (!q || u.display_name.toLowerCase().includes(q) || u.username.includes(q)))
+      .map((u) => ({ user: u, conversation: byId.get(u.id) }))
+      .sort((a, b) => {
+        const at = a.conversation?.last_message?.created_at ?? ''
+        const bt = b.conversation?.last_message?.created_at ?? ''
+        return bt.localeCompare(at) || a.user.display_name.localeCompare(b.user.display_name)
+      })
+  }, [team, conversations, filter, me.id])
+
+  const active = team.find((u) => u.id === activeId) ?? null
+  const messages = useMemo(() => [...(thread.data ?? []), ...pending.filter((p) => p.receiver_id === activeId)], [thread.data, pending, activeId])
+
+  // Opening a thread marks it read on the server; refresh the badges.
+  useEffect(() => {
+    if (thread.dataUpdatedAt) {
+      void queryClient.invalidateQueries({ queryKey: keys.unread })
+      void queryClient.invalidateQueries({ queryKey: keys.conversations })
     }
-  };
+  }, [thread.dataUpdatedAt, queryClient])
 
-  const loadMessages = async () => {
-    if (!activeMemberId) return;
+  useLayoutEffect(() => {
+    const node = scrollRef.current
+    if (node) node.scrollTop = node.scrollHeight
+  }, [messages.length, activeId])
+
+  const select = (id: number | null) => setParams(id ? { user: String(id) } : {}, { replace: true })
+
+  const send = async (event?: FormEvent) => {
+    event?.preventDefault()
+    const content = draft.trim()
+    if (!content || !activeId) return
+    const temp: DirectMessage = { id: `p-${Date.now()}`, sender_id: me.id, receiver_id: activeId, content, is_read: false, created_at: new Date().toISOString(), pending: true }
+    setPending((p) => [...p, temp])
+    setDraft('')
     try {
-      const res = await api.get(`/messages/?user_id=${activeMemberId}`);
-      setMessages(Array.isArray(res.data) ? res.data : res.data.results ?? []);
-    } catch (e) {
-      console.error(e);
+      await api.post('/messages/', { receiver_id: activeId, content })
+      await queryClient.invalidateQueries({ queryKey: keys.thread(activeId) })
+      void queryClient.invalidateQueries({ queryKey: keys.conversations })
+    } catch (error) {
+      toast.error(errorMessage(error))
+      setDraft(content)
+    } finally {
+      setPending((p) => p.filter((x) => x.id !== temp.id))
     }
-  };
+  }
 
-  useEffect(() => { void loadData(); }, []);
-
-  // 🔥 THE FIX: Polling interval for live chat
-  useEffect(() => { 
-    if (!activeMemberId) return;
-    
-    // Initial load when user is selected
-    void loadMessages(); 
-    
-    // Set up silent background check every 3 seconds
-    const intervalId = setInterval(() => {
-      void loadMessages();
-    }, 3000);
-
-    // Clean up interval when you click a different user or leave the page
-    return () => clearInterval(intervalId);
-  }, [activeMemberId]);
-  
-  // Auto-scroll to bottom
-  useEffect(() => { 
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; 
-  }, [messages]);
-
-  const handleSend = async () => {
-    if (!input.trim() || !activeMemberId) return;
-    try {
-      await api.post('/messages/', { receiver_id: activeMemberId, content: input });
-      setInput('');
-      await loadMessages(); // Fetch immediately so sender sees it instantly
-    } catch (e) {
-      console.error(e);
-    }
-  };
+  let lastDay = ''
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} 
-      animate={{ opacity: 1 }} 
-      className="grid h-[calc(100vh-140px)] grid-cols-1 gap-6 xl:grid-cols-[320px_1fr] overflow-hidden"
-    >
-      {/* LEFT: TEAMMATES LIST */}
-      <div className="flex flex-col rounded-[35px] border border-gray-100 bg-white p-6 shadow-sm dark:bg-[#1C1C1E]">
-        <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-black italic uppercase tracking-tighter">Operatives</h1>
-            <ShieldCheck size={16} className="text-gray-300" />
+    <div className="flex h-[calc(100dvh-3.5rem)] lg:h-[100dvh]">
+      <aside className={cn('w-full shrink-0 flex-col border-r border-line md:flex md:w-[300px]', activeId ? 'hidden' : 'flex')}>
+        <div className="px-4 pb-3 pt-5">
+          <h1 className="text-xl font-semibold tracking-[-0.02em]">Messages</h1>
+          <div className="mt-3">
+            <Input leading={<MagnifyingGlassIcon className="h-4 w-4" />} value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find someone" aria-label="Find someone" className="h-9" />
+          </div>
         </div>
-        <div className="space-y-2 overflow-y-auto pr-2">
-          {members.map(m => (
-            <button 
-              key={m.id} 
-              onClick={() => setActiveMemberId(m.id)} 
-              className={`flex w-full items-center gap-4 rounded-[20px] p-4 transition-all ${
-                activeMemberId === m.id 
-                ? 'bg-black text-white shadow-lg' 
-                : 'hover:bg-gray-50 text-gray-500'
-              }`}
-            >
-              <div className={`p-2 rounded-lg ${activeMemberId === m.id ? 'bg-white/10' : 'bg-gray-100'}`}>
-                <User size={18} />
-              </div>
-              <div className="text-left">
-                <p className="text-sm font-black uppercase tracking-tight">{m.username}</p>
-                <p className={`text-[9px] font-bold uppercase opacity-50 ${activeMemberId === m.id ? 'text-white' : 'text-gray-400'}`}>
-                  {m.role}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* RIGHT: CHAT AREA */}
-      <div className="flex flex-col rounded-[35px] border border-gray-100 bg-white shadow-sm overflow-hidden dark:bg-[#1C1C1E]">
-        {/* MESSAGES LIST */}
-        <div ref={scrollRef} className="flex-1 space-y-6 overflow-y-auto p-8 scroll-smooth">
-          {messages.length > 0 ? messages.map(msg => {
-            const isMe = msg.sender.id !== activeMemberId;
-
+        <ul className="flex-1 overflow-y-auto px-2 pb-4">
+          {teamLoading && <SkeletonRows rows={6} />}
+          {people.map(({ user, conversation }) => {
+            const last = conversation?.last_message
+            const unread = conversation?.unread ?? 0
             return (
-              <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[75%] space-y-1 ${isMe ? 'items-end' : 'items-start'}`}>
-                  <div className={`rounded-[22px] px-5 py-3 text-sm font-medium shadow-sm ${
-                    isMe 
-                    ? 'bg-black text-white rounded-br-none' 
-                    : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}>
-                    {msg.content}
-                  </div>
-                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-300 px-2">
-                    {isMe ? 'Sent' : 'Received'}
-                  </p>
-                </div>
-              </div>
-            );
-          }) : (
-            <div className="flex h-full items-center justify-center text-gray-300 italic text-sm">
-                No communications found. Start the debrief.
-            </div>
-          )}
-        </div>
+              <li key={user.id}>
+                <button
+                  onClick={() => select(user.id)}
+                  className={cn('flex w-full items-center gap-3 rounded-control px-2.5 py-2.5 text-left transition-colors', user.id === activeId ? 'bg-elevated' : 'hover:bg-elevated/60')}
+                >
+                  <Avatar name={user.display_name} seed={user.username} online={user.online} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className={cn('min-w-0 flex-1 truncate text-sm', unread ? 'font-semibold text-fg' : 'font-medium')}>{user.display_name}</span>
+                      {last && <span className="shrink-0 text-[11px] text-subtle">{relativeTime(last.created_at)}</span>}
+                    </span>
+                    <span className="mt-0.5 flex items-center gap-2">
+                      <span className={cn('min-w-0 flex-1 truncate text-[13px]', unread ? 'text-fg' : 'text-subtle')}>
+                        {last ? `${last.sender_id === me.id ? 'You: ' : ''}${last.content}` : user.role}
+                      </span>
+                      {unread > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold text-on-accent tabular">{unread}</span>}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+          {!teamLoading && !people.length && <p className="px-3 py-8 text-center text-sm text-subtle">No one matches that name.</p>}
+        </ul>
+      </aside>
 
-        {/* INPUT BAR */}
-        <div className="p-6 border-t border-gray-50">
-            <div className="flex gap-3 bg-gray-50 rounded-[22px] p-2 pr-3 items-center border border-gray-100">
-              <input 
-                value={input} 
-                onChange={(e) => setInput(e.target.value)} 
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()} 
-                placeholder="Secure transmission..." 
-                className="flex-1 bg-transparent px-5 py-2 text-sm outline-none font-medium" 
-              />
-              <button 
-                onClick={handleSend} 
-                disabled={!input.trim()}
-                className="rounded-xl bg-black p-3 text-white transition-transform hover:scale-105 active:scale-95 disabled:opacity-20"
-              >
-                <SendHorizonal size={20} />
+      <section className={cn('min-w-0 flex-1 flex-col', activeId ? 'flex' : 'hidden md:flex')}>
+        {!active ? (
+          <EmptyState className="flex-1" icon={<ChatsCircleIcon className="h-6 w-6" />} title="Pick someone to message" description="Direct messages are only visible to you and the person you are talking to." />
+        ) : (
+          <>
+            <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line px-4">
+              <button onClick={() => select(null)} className="-ml-1 flex h-9 w-9 items-center justify-center rounded-control text-muted hover:bg-elevated md:hidden" aria-label="Back to people">
+                <ArrowLeftIcon />
               </button>
+              <Avatar name={active.display_name} seed={active.username} online={active.online} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{active.display_name}</p>
+                <p className="text-xs text-subtle">{active.role}, {active.online ? 'active now' : `last seen ${relativeTime(active.last_seen)}`}</p>
+              </div>
+            </header>
+
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+              {thread.isLoading ? (
+                <SkeletonRows rows={4} />
+              ) : !messages.length ? (
+                <p className="py-16 text-center text-sm text-subtle">No messages yet. Say hello to {active.first_name || active.display_name}.</p>
+              ) : (
+                <ol className="mx-auto max-w-2xl space-y-1.5">
+                  <AnimatePresence initial={false}>
+                    {messages.map((message, index) => {
+                      const mine = message.sender_id === me.id
+                      const day = dayLabel(message.created_at)
+                      const showDay = day !== lastDay
+                      lastDay = day
+                      const next = messages[index + 1]
+                      const tail = !next || next.sender_id !== message.sender_id
+                      return (
+                        <motion.li key={message.id} layout="position" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}>
+                          {showDay && <p className="py-4 text-center text-xs font-medium text-subtle">{day}</p>}
+                          <div className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+                            <div
+                              className={cn(
+                                'max-w-[78%] whitespace-pre-wrap break-words rounded-[16px] px-3.5 py-2 text-[14.5px] leading-6',
+                                mine ? 'bg-accent text-on-accent' : 'bg-elevated text-fg ring-1 ring-line',
+                                tail && (mine ? 'rounded-br-[5px]' : 'rounded-bl-[5px]'),
+                                message.pending && 'opacity-60',
+                              )}
+                              title={formatTime(message.created_at)}
+                            >
+                              {message.content}
+                            </div>
+                          </div>
+                          {tail && <p className={cn('mt-1 px-1 text-[11px] text-subtle', mine && 'text-right')}>{message.pending ? 'Sending' : formatTime(message.created_at)}</p>}
+                        </motion.li>
+                      )
+                    })}
+                  </AnimatePresence>
+                </ol>
+              )}
             </div>
-        </div>
-      </div>
-    </motion.div>
-  );
+
+            <form onSubmit={send} className="shrink-0 px-4 pb-4 sm:px-8">
+              <div className="mx-auto flex max-w-2xl items-end gap-2 rounded-[16px] border border-line bg-surface p-2 shadow-panel focus-within:border-line-strong">
+                <textarea
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                      e.preventDefault()
+                      void send()
+                    }
+                  }}
+                  rows={1}
+                  placeholder={`Message ${active.first_name || active.display_name}`}
+                  aria-label="Message"
+                  className="max-h-32 min-h-[36px] flex-1 resize-none bg-transparent px-2 py-1.5 text-[15px] leading-6 text-fg placeholder:text-subtle focus:outline-none [field-sizing:content]"
+                />
+                <button type="submit" disabled={!draft.trim()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-accent text-on-accent transition-[transform,opacity] active:scale-[0.94] disabled:opacity-30" aria-label="Send">
+                  <ArrowUpIcon weight="bold" className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+          </>
+        )}
+      </section>
+    </div>
+  )
 }

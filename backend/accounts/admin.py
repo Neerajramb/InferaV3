@@ -7,7 +7,7 @@ from .models import User
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     fieldsets = BaseUserAdmin.fieldsets + (
-        ("Secure RAG Workspace", {"fields": ("role",)}),
+        ("Infera", {"fields": ("role", "last_seen")}),
     )
-    list_display = ("username", "email", "first_name", "last_name", "role", "is_staff")
+    list_display = ("username", "email", "first_name", "last_name", "role", "is_active", "last_seen")
     list_filter = ("role", "is_staff", "is_superuser", "is_active")

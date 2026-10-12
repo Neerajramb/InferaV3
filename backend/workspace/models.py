@@ -1,5 +1,14 @@
+from pathlib import Path
+
 from django.conf import settings
 from django.db import models
+
+
+class IndexStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    PROCESSING = "processing", "Processing"
+    READY = "ready", "Ready"
+    FAILED = "failed", "Failed"
 
 
 class Project(models.Model):
@@ -22,6 +31,25 @@ class Project(models.Model):
         return self.name
 
 
+class ProjectMember(models.Model):
+    class MemberRole(models.TextChoices):
+        OWNER = "owner", "Owner"
+        EDITOR = "editor", "Editor"
+        VIEWER = "viewer", "Viewer"
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="memberships")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="project_memberships")
+    role = models.CharField(max_length=20, choices=MemberRole.choices, default=MemberRole.EDITOR)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("project", "user")
+        unique_together = ("project", "user")
+
+    def __str__(self) -> str:
+        return f"{self.user} -> {self.project} ({self.role})"
+
+
 class Folder(models.Model):
     name = models.CharField(max_length=255)
     parent = models.ForeignKey("self", on_delete=models.CASCADE, related_name="children", null=True, blank=True)
@@ -42,13 +70,20 @@ class Document(models.Model):
     folder = models.ForeignKey(Folder, on_delete=models.SET_NULL, related_name="documents", null=True, blank=True)
     title = models.CharField(max_length=255)
     file = models.FileField(upload_to="documents/")
+    file_size = models.PositiveBigIntegerField(default=0)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="uploaded_documents")
     created_at = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=IndexStatus.choices, default=IndexStatus.PENDING)
+    error = models.TextField(blank=True)
     chunk_count = models.PositiveIntegerField(default=0)
     indexed_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ("-created_at",)
+
+    @property
+    def extension(self) -> str:
+        return Path(self.file.name or self.title).suffix.lower().lstrip(".")
 
     def __str__(self) -> str:
         return self.title
@@ -62,6 +97,7 @@ class Note(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notes")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, choices=IndexStatus.choices, default=IndexStatus.PENDING)
     chunk_count = models.PositiveIntegerField(default=0)
     indexed_at = models.DateTimeField(null=True, blank=True)
 
@@ -72,25 +108,6 @@ class Note(models.Model):
         return self.title
 
 
-class ProjectMember(models.Model):
-    class MemberRole(models.TextChoices):
-        OWNER = "owner", "Owner"
-        EDITOR = "editor", "Editor"
-        VIEWER = "viewer", "Viewer"
-
-    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name="memberships")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="project_memberships")
-    role = models.CharField(max_length=20, choices=MemberRole.choices, default=MemberRole.VIEWER)
-    joined_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ("project", "user")
-        unique_together = ("project", "user")
-
-    def __str__(self) -> str:
-        return f"{self.user} -> {self.project} ({self.role})"
-
-
 class Query(models.Model):
     query_text = models.TextField()
     response_text = models.TextField()
@@ -98,6 +115,8 @@ class Query(models.Model):
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name="queries")
     created_at = models.DateTimeField(auto_now_add=True)
     sources = models.JSONField(default=list, blank=True)
+    provider = models.CharField(max_length=40, blank=True)
+    latency_ms = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ("-created_at",)
@@ -111,6 +130,7 @@ class Log(models.Model):
 
     class Meta:
         ordering = ("-timestamp",)
+        indexes = [models.Index(fields=["action", "-timestamp"])]
 
     def __str__(self) -> str:
         return f"{self.action} @ {self.timestamp.isoformat()}"
@@ -118,7 +138,7 @@ class Log(models.Model):
 
 class ChatSession(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chat_sessions")
-    title = models.CharField(max_length=255, default="New Chat")
+    title = models.CharField(max_length=255, default="New chat")
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, related_name="chat_sessions", null=True, blank=True)
     selected_folder_ids = models.JSONField(default=list, blank=True)
     selected_document_ids = models.JSONField(default=list, blank=True)
@@ -135,7 +155,7 @@ class ChatSession(models.Model):
 
 class ChatMessage(models.Model):
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name="messages")
-    role = models.CharField(max_length=10)
+    role = models.CharField(max_length=10)  # "user" or "ai"
     content = models.TextField()
     sources = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -153,6 +173,7 @@ class Message(models.Model):
 
     class Meta:
         ordering = ("created_at",)
+        indexes = [models.Index(fields=["receiver", "is_read"])]
 
     def __str__(self) -> str:
         return f"{self.sender} -> {self.receiver}"

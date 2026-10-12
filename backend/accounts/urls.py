@@ -1,10 +1,9 @@
 from django.urls import path
 
-from .views import RegisterView, CustomTokenObtainPairView, MeView, DashboardView, UpdateRoleView
+from .views import DevRoleSwitchView, MeView, PasswordChangeView
 
 urlpatterns = [
-    path("register/", RegisterView.as_view(), name="register"),
     path("me/", MeView.as_view(), name="me"),
-    path("dashboard/", DashboardView.as_view(), name="dashboard"),
-    path('profile/update-role/', UpdateRoleView.as_view(), name='update-role'),
+    path("password/", PasswordChangeView.as_view(), name="password-change"),
+    path("profile/update-role/", DevRoleSwitchView.as_view(), name="update-role"),
 ]

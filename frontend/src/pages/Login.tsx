@@ -1,170 +1,164 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Lock, User, ArrowRight } from "lucide-react";
-import { useAuthStore } from "../store/authStore";
+import { useMemo, useState, type FormEvent } from 'react'
+import axios from 'axios'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { motion, useReducedMotion } from 'motion/react'
+import { ArrowLeftIcon, ArrowRightIcon, EyeIcon, EyeSlashIcon } from '@phosphor-icons/react'
+
+import { Logo } from '../components/app/Logo'
+import { Button } from '../components/ui/Button'
+import { Field, Input } from '../components/ui/Field'
+import { API_URL, errorMessage } from '../lib/api'
+import { useAuth } from '../store/auth'
+
+const DEMO_ACCOUNTS = [
+  { username: 'ananya', role: 'Founder' },
+  { username: 'tomas', role: 'HR' },
+  { username: 'wei', role: 'PM' },
+  { username: 'ifeoma', role: 'Employee' },
+]
+
+/** A field of indexed passages. A handful light up, like a query finding its matches. */
+function PassageField() {
+  const reduce = useReducedMotion()
+  const cells = useMemo(
+    () =>
+      Array.from({ length: 168 }, (_, i) => ({
+        delay: ((i * 37) % 97) / 10,
+        width: 35 + ((i * 53) % 60),
+      })),
+    [],
+  )
+  return (
+    <div className="grid grid-cols-12 gap-x-2 gap-y-3" aria-hidden="true">
+      {cells.map((cell, i) => (
+        <motion.span
+          key={i}
+          className="h-1.5 rounded-full bg-fg/[0.07]"
+          style={{ width: `${cell.width}%` }}
+          animate={reduce ? undefined : { backgroundColor: ['rgb(var(--fg) / 0.07)', 'rgb(var(--accent) / 0.85)', 'rgb(var(--fg) / 0.07)'] }}
+          transition={reduce ? undefined : { duration: 2.6, delay: cell.delay, repeat: Infinity, repeatDelay: 7 + (i % 5), ease: 'easeInOut' }}
+        />
+      ))}
+    </div>
+  )
+}
 
 export default function Login() {
-  const navigate = useNavigate();
-  const { setAuth } = useAuthStore();
+  const navigate = useNavigate()
+  const location = useLocation()
+  const access = useAuth((s) => s.access)
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const from = (location.state as { from?: string } | null)?.from ?? '/dashboard'
 
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  if (access) return <Navigate to={from} replace />
 
-  const handleLogin = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (loading) return;
-
-    if (!username || !password) {
-      setError("Please enter both username and password");
-      return;
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!username.trim() || !password) {
+      setError('Enter your username and password.')
+      return
     }
-
-    setLoading(true);
-    setError(null);
-
+    setLoading(true)
+    setError(null)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/token/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-          password: password.trim(),
-        }),
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        localStorage.setItem("access", data.access);
-        localStorage.setItem("refresh", data.refresh);
-
-        setAuth({
-          access: data.access,
-          refresh: data.refresh,
-          user: data.user || {
-            username,
-            role: "Founder",
-          },
-        });
-
-        navigate("/dashboard");
-      } else {
-        setError(data?.detail || "Invalid credentials. Please try again.");
-      }
+      const { data } = await axios.post(`${API_URL}/token/`, { username: username.trim(), password })
+      useAuth.getState().setSession(data)
+      navigate(from, { replace: true })
     } catch (err) {
-      console.error("LOGIN ERROR:", err);
-      setError("Unable to connect to the Infera server.");
+      if (axios.isAxiosError(err) && err.response?.status === 401) setError('That username and password combination is not right.')
+      else if (axios.isAxiosError(err) && err.response?.status === 429) setError('Too many attempts. Wait a minute and try again.')
+      else setError(errorMessage(err))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2 bg-[#000000] text-white selection:bg-white selection:text-black">
-      
-      {/* BRANDING COLUMN (LEFT) - NOW CENTERED & BIG FONT */}
-      <div className="hidden md:flex flex-col justify-between p-12 bg-[#1C1C1E] border-r border-white/5">
-        {/* Empty top slot to push content down for vertical centering */}
-        <div />
+    <div className="grid min-h-[100dvh] bg-bg lg:grid-cols-[1.1fr_1fr]">
+      <aside className="relative hidden overflow-hidden border-r border-line bg-surface lg:flex lg:flex-col lg:justify-between lg:p-12">
+        <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_20%_10%,rgb(var(--accent)/0.08),transparent_70%)]" />
+        <Link to="/" className="relative w-fit">
+          <Logo />
+        </Link>
+        <div className="relative">
+          <PassageField />
+          <h1 className="mt-14 max-w-md text-[34px] font-semibold leading-[1.1] tracking-[-0.03em]">Every answer points back to the page it came from.</h1>
+          <p className="mt-4 max-w-sm text-[15px] leading-7 text-muted">Ask in plain language. Infera searches only what your role can open and cites each source.</p>
+        </div>
+        <p className="relative text-xs text-subtle">Runs on your own server. Files stay where you upload them.</p>
+      </aside>
 
-        {/* Centerised Main Content */}
+      <main className="flex flex-col px-5 py-6 sm:px-10">
+        <div className="flex items-center justify-between">
+          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg">
+            <ArrowLeftIcon className="h-4 w-4" /> Home
+          </Link>
+          <span className="lg:hidden"><Logo /></span>
+        </div>
+
         <motion.div
+          className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-12"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="flex flex-col items-center justify-center text-center p-10"
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* 🔥 BIG "INFERA" FONT */}
-          <h1 className="text-7xl font-black tracking-tighter uppercase italic text-white">
-            Infera
-          </h1>
-          
-          {/* 🔥 BIG SUBTITLE FONT */}
-          <p className="mt-8 text-2xl text-gray-400 font-medium max-w-lg leading-snug">
-            The Secure Local-Network Intelligence Hub for Modern Teams.
-          </p>
-        </motion.div>
+          <h2 className="text-2xl font-semibold tracking-[-0.02em]">Sign in to your workspace</h2>
+          <p className="mt-2 text-sm text-muted">Accounts are created by your Founder or HR team.</p>
 
-        {/* Audit / Version Footer */}
-        <div className="text-[10px] uppercase tracking-[0.2em] text-gray-600 font-bold text-center">
-          © {new Date().getFullYear()} Infera Systems · Local Node v1.0
-        </div>
-      </div>
-
-      {/* LOGIN FORM COLUMN (RIGHT) - UNCHANGED */}
-      <div className="flex items-center justify-center p-8">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md"
-        >
-          <div className="mb-10 text-center md:text-left">
-            <h2 className="text-3xl font-bold tracking-tight">Welcome Back</h2>
-            <p className="text-gray-500 mt-2 text-sm">Please enter your workspace credentials.</p>
-          </div>
-
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }} 
-              animate={{ opacity: 1, height: 'auto' }}
-              className="mb-6 p-4 bg-red-950/30 border border-red-900/50 rounded-2xl text-red-400 text-xs font-bold"
-            >
-              {error}
-            </motion.div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 ml-1">Username</label>
-              <div className="relative group">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 group-focus-within:text-white transition-colors" />
-                <input
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Workspace identifier"
-                  className="w-full bg-[#1C1C1E] border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:border-white/20 focus:bg-[#252527] transition-all placeholder:text-gray-700"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-500 ml-1">Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 group-focus-within:text-white transition-colors" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full bg-[#1C1C1E] border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-sm outline-none focus:border-white/20 focus:bg-[#252527] transition-all placeholder:text-gray-700"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full bg-white text-black font-black uppercase text-xs tracking-[0.2em] py-5 rounded-2xl hover:bg-gray-200 transition-all disabled:opacity-50 overflow-hidden"
-            >
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                {loading ? "Decrypting..." : "Access Workspace"}
-                {!loading && <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />}
-              </span>
-            </button>
+          <form onSubmit={submit} className="mt-8 space-y-4" noValidate>
+            <Field label="Username">
+              {(p) => <Input {...p} value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus spellCheck={false} />}
+            </Field>
+            <Field label="Password" error={error}>
+              {(p) => (
+                <div className="relative">
+                  <Input {...p} type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className="pr-11" />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[8px] text-subtle hover:text-fg"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                  </button>
+                </div>
+              )}
+            </Field>
+            <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full" iconRight={<ArrowRightIcon className="h-4 w-4" />}>
+              Sign in
+            </Button>
           </form>
 
-          <div className="mt-10 text-center">
-            <p className="text-xs text-gray-600 font-medium">
-              Forgot credentials? <a href="#" className="text-gray-400 hover:text-white transition-colors underline underline-offset-4">Contact System Administrator</a>
-            </p>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="mt-10 rounded-control border border-dashed border-line p-4">
+              <p className="text-xs font-medium text-muted">Demo accounts (development only)</p>
+              <p className="mt-1 text-xs text-subtle">
+                Created by <code className="font-mono">manage.py seed_demo</code>. Password <code className="font-mono">infera-demo-2026</code>.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <button
+                    key={account.username}
+                    type="button"
+                    onClick={() => {
+                      setUsername(account.username)
+                      setPassword('infera-demo-2026')
+                      setError(null)
+                    }}
+                    className="rounded-chip border border-line bg-elevated px-2 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-fg"
+                  >
+                    {account.username} <span className="text-subtle">{account.role}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
-      </div>
+      </main>
     </div>
-  );
+  )
 }
