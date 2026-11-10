@@ -111,8 +111,10 @@ function SessionList({ sessions, loading, activeId, onSelect, onNew, onRename, o
 function EmptyChat({ onPick, scopeText }: { onPick: (text: string) => void; scopeText: string }) {
   const { data: docs = [] } = useDocuments('all')
   const ready = docs.filter((d) => d.status === 'ready').slice(0, 2)
+  // File names read better without the extension and with spaces for separators.
+  const nice = (title: string) => title.replace(/\.[a-z0-9]{1,5}$/i, '').replace(/[_]+/g, ' ').trim()
   const suggestions = [
-    ...ready.map((d, i) => (i === 0 ? `Summarize ${d.title}` : `What are the main points in ${d.title}?`)),
+    ...ready.map((d, i) => (i === 0 ? `Summarize ${nice(d.title)}` : `What are the main points in ${nice(d.title)}?`)),
     'List the deadlines and dates mentioned in my documents',
     'Who is responsible for what, according to our policies?',
   ].slice(0, 4)
@@ -128,7 +130,7 @@ function EmptyChat({ onPick, scopeText }: { onPick: (text: string) => void; scop
           Infera answers from {scopeText.toLowerCase()} and cites every passage it uses.
         </p>
       </motion.div>
-      <div className="mt-8 grid gap-2 sm:grid-cols-2">
+      <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {suggestions.map((text, i) => (
           <motion.button
             key={text}
@@ -136,7 +138,7 @@ function EmptyChat({ onPick, scopeText }: { onPick: (text: string) => void; scop
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.08 + i * 0.05, ease: [0.16, 1, 0.3, 1] }}
             onClick={() => onPick(text)}
-            className="rounded-control border border-line bg-surface px-4 py-3 text-left text-sm leading-5 text-muted transition-[border-color,color,transform] duration-150 hover:border-line-strong hover:text-fg active:scale-[0.98]"
+            className="min-w-0 rounded-control border border-line bg-surface px-4 py-3 text-left text-sm leading-5 text-muted transition-[border-color,color,transform] duration-150 [overflow-wrap:anywhere] hover:border-line-strong hover:text-fg active:scale-[0.98]"
           >
             {text}
           </motion.button>
@@ -176,6 +178,7 @@ export default function Chat() {
   const messagesRef = useRef<ChatMessage[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const autoSentRef = useRef(false)
+  const lastQueryRef = useRef('')
   messagesRef.current = messages
 
   // Which session's messages are on screen. History is only loaded when switching to a
@@ -228,6 +231,7 @@ export default function Chat() {
       if (!query || streaming) return
       setError(null)
       setInput('')
+      lastQueryRef.current = query
       stickRef.current = true
       const now = new Date().toISOString()
       const tempUserId = `u-${Date.now()}`
@@ -420,7 +424,7 @@ export default function Chat() {
 
         <div className="shrink-0 px-4 pb-4 pt-2 sm:px-6">
           <div className="mx-auto w-full max-w-3xl">
-            {error && <div className="mb-2"><ErrorState message={error} onRetry={() => void send(input)} /></div>}
+            {error && <div className="mb-2"><ErrorState message={error} onRetry={() => void send(input.trim() || lastQueryRef.current)} /></div>}
             <form
               onSubmit={(e) => {
                 e.preventDefault()

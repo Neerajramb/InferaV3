@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate, useOutlet } from 'react-router-dom'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowsLeftRightIcon,
   GearSixIcon,
   ListIcon,
   MagnifyingGlassIcon,
@@ -29,7 +28,6 @@ import { AssistantDot, assistantLabel } from './AssistantStatus'
 import { CommandPalette } from './CommandPalette'
 import { LogoMark } from './Logo'
 import { NAV_GROUPS } from './nav'
-import { RoleSwitchDialog } from './RoleSwitchDialog'
 
 const COLLAPSE_KEY = 'infera-sidebar-collapsed'
 
@@ -58,11 +56,10 @@ interface SidebarProps {
   onToggle?: () => void
   onNavigate?: () => void
   onOpenPalette: () => void
-  onOpenRoleSwitch: () => void
   mobile?: boolean
 }
 
-function Sidebar({ collapsed, onToggle, onNavigate, onOpenPalette, onOpenRoleSwitch, mobile }: SidebarProps) {
+function Sidebar({ collapsed, onToggle, onNavigate, onOpenPalette, mobile }: SidebarProps) {
   const user = useAuth((s) => s.user)
   const { data: unread } = useUnread()
   const { data: system } = useSystemStatus()
@@ -201,7 +198,6 @@ function Sidebar({ collapsed, onToggle, onNavigate, onOpenPalette, onOpenRoleSwi
               icon: themeIcon[preference],
               onSelect: () => setPreference(nextTheme[preference]),
             },
-            ...(user?.dev_role_switch ? [{ label: 'Preview another role', icon: <ArrowsLeftRightIcon />, onSelect: onOpenRoleSwitch }] : []),
             'divider' as const,
             { label: 'Sign out', icon: <SignOutIcon />, onSelect: () => void signOut(), danger: true },
           ]}
@@ -230,7 +226,6 @@ export default function AppShell() {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [roleSwitchOpen, setRoleSwitchOpen] = useState(false)
   const location = useLocation()
   const outlet = useOutlet()
   const reduce = useReducedMotion()
@@ -259,9 +254,15 @@ export default function AppShell() {
 
   useEffect(() => setDrawerOpen(false), [location.pathname])
 
+  useEffect(() => {
+    if (!drawerOpen) return
+    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && setDrawerOpen(false)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drawerOpen])
+
   const sidebarProps = {
     onOpenPalette: () => setPaletteOpen(true),
-    onOpenRoleSwitch: () => setRoleSwitchOpen(true),
   }
 
   return (
@@ -330,7 +331,6 @@ export default function AppShell() {
       </AnimatePresence>
 
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      <RoleSwitchDialog open={roleSwitchOpen} onClose={() => setRoleSwitchOpen(false)} />
     </div>
   )
 }

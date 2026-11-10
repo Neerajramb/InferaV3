@@ -7,6 +7,7 @@ import { useNavigate, type NavigateFunction } from 'react-router-dom'
 import { toast } from 'sonner'
 
 import { errorMessage, openDocument } from '../../lib/api'
+import { copyText } from '../../lib/clipboard'
 import { cn } from '../../lib/format'
 import type { ChatMessage, Source } from '../../lib/types'
 
@@ -132,7 +133,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={async () => {
-        await navigator.clipboard.writeText(text)
+        if (!(await copyText(text))) return toast.error("Couldn't copy the answer.")
         setCopied(true)
         setTimeout(() => setCopied(false), 1500)
       }}

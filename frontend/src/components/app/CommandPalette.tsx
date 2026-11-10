@@ -77,7 +77,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       icon: hit.entity_type === 'note' ? <NoteIcon /> : <FileTextIcon />,
       run: () => {
         onClose()
-        if (hit.entity_type === 'note') navigate(`/notes?note=${hit.entity_id}`)
+        if (hit.entity_type === 'note') navigate(`/notes?note=${hit.entity_id}&space=all`)
         else openDocument(hit.entity_id, hit.title).catch((e) => toast.error(errorMessage(e)))
       },
     }))

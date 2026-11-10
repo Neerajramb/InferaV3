@@ -50,9 +50,9 @@ def _ollama_status() -> ProviderStatus:
         wanted = settings.OLLAMA_MODEL
         if wanted in names or f"{wanted}:latest" in names:
             return ProviderStatus("ollama", wanted, True, "Local model ready")
-        return ProviderStatus("ollama", wanted, False, f"Model '{wanted}' is not pulled. Run: ollama pull {wanted}")
+        return ProviderStatus("ollama", wanted, False, f"The {wanted} model is not installed on the server")
     except Exception:
-        return ProviderStatus("ollama", settings.OLLAMA_MODEL, False, "Ollama is not running")
+        return ProviderStatus("ollama", settings.OLLAMA_MODEL, False, "No language model is connected")
 
 
 def provider_status(force: bool = False) -> ProviderStatus:
@@ -133,11 +133,24 @@ def _stream_gemini(messages: list[dict]) -> Iterator[str]:
 MARKDOWN_NOISE = re.compile(r"(^|\s)(#{1,6}|[*_]{2,}|>)\s*")
 
 
+QUOTE_CHARS = 320
+# In passage mode, only quote passages that are close to the best match.
+QUOTE_RELATIVE_CUTOFF = 0.75
+
+
+def _clip(text: str, limit: int = QUOTE_CHARS) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0]
+    return f"{cut}..."
+
+
 def _best_sentences(text: str, query_terms: set[str], limit: int = 2) -> list[str]:
     text = MARKDOWN_NOISE.sub(" ", text).strip()
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 25]
     if not sentences:
-        return [text[:280].strip()]
+        return [_clip(text, 280)]
     scored = sorted(
         enumerate(sentences),
         key=lambda pair: (-len(query_terms & set(tokenize(pair[1]))), pair[0]),
@@ -146,16 +159,20 @@ def _best_sentences(text: str, query_terms: set[str], limit: int = 2) -> list[st
     return [sentence for _, sentence in chosen]
 
 
-def extractive_answer(query: str, hits: list[dict], reason: str = "") -> str:
+def extractive_answer(query: str, hits: list[dict]) -> str:
+    """Quote the strongest passages when no language model is available.
+
+    Citation numbers match the position of each hit in the source list.
+    """
     if not hits:
         return "I couldn't find anything about that in the documents you can access."
     terms = {t for t in tokenize(query) if t not in STOPWORDS}
-    intro = "Here are the passages in your workspace that best match the question."
-    if reason:
-        intro = f"{reason}, so I can't write a summarized answer. These are the passages that best match the question."
-    lines = [intro, ""]
+    best = max(hit.get("relevance", hit.get("score", 0.0)) for hit in hits)
+    lines = ["Here are the passages in your workspace that best match your question.", ""]
     for number, hit in enumerate(hits[:4], start=1):
-        quote = " ".join(_best_sentences(hit["text"], terms))
+        if number > 1 and hit.get("relevance", hit.get("score", 0.0)) < best * QUOTE_RELATIVE_CUTOFF:
+            continue
+        quote = _clip(" ".join(_best_sentences(hit["text"], terms)))
         lines.append(f"> {quote} [{number}]")
         lines.append("")
     return "\n".join(lines).strip()
@@ -176,8 +193,7 @@ def stream_answer(messages: list[dict], query: str, hits: list[dict]) -> tuple[P
 
     def generate() -> Iterator[str]:
         if status.provider == "extractive" or not hits:
-            reason = "" if settings.LLM_PROVIDER == "extractive" else status.detail
-            yield from _chunked(extractive_answer(query, hits, reason))
+            yield from _chunked(extractive_answer(query, hits))
             return
         produced = False
         try:
@@ -191,6 +207,6 @@ def stream_answer(messages: list[dict], query: str, hits: list[dict]) -> tuple[P
             if produced:
                 yield "\n\n_The model stopped responding before finishing this answer._"
             else:
-                yield from _chunked(extractive_answer(query, hits, "The language model failed to respond"))
+                yield from _chunked(extractive_answer(query, hits))
 
     return status, generate()

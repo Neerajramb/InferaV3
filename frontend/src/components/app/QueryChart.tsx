@@ -17,13 +17,15 @@ const dayFormat = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateStrin
 export function QueryChart({ data }: { data: Point[] }) {
   const [hover, setHover] = useState<number | null>(null)
   const reduce = useReducedMotion()
-  const max = Math.max(...data.map((d) => d.count), 1)
+  const peak = Math.max(...data.map((d) => d.count), 1)
+  // An even top keeps the middle gridline on a whole number.
+  const max = peak === 1 ? 1 : Math.ceil(peak / 2) * 2
   const total = data.reduce((sum, d) => sum + d.count, 0)
-  const ticks = [max, Math.round(max / 2), 0].filter((v, i, a) => a.indexOf(v) === i)
+  const ticks = max === 1 ? [1, 0] : [max, max / 2, 0]
 
   return (
-    <figure className="relative">
-      <div className="flex h-44 gap-3">
+    <figure className="relative flex flex-1 flex-col">
+      <div className="flex min-h-44 flex-1 gap-3">
         <div className="flex flex-col justify-between pb-6 text-right text-[11px] text-subtle tabular" aria-hidden="true">
           {ticks.map((tick) => (
             <span key={tick} className="-translate-y-1/2 first:translate-y-0 last:translate-y-0">{tick}</span>
@@ -31,7 +33,7 @@ export function QueryChart({ data }: { data: Point[] }) {
         </div>
         <div className="relative flex-1">
           <div className="absolute inset-x-0 top-0 h-px bg-line/60" aria-hidden="true" />
-          <div className="absolute inset-x-0 top-[calc(50%-12px)] h-px bg-line/60" aria-hidden="true" />
+          {max > 1 && <div className="absolute inset-x-0 top-[calc(50%-12px)] h-px bg-line/60" aria-hidden="true" />}
           <div className="absolute inset-x-0 bottom-6 flex h-[calc(100%-1.5rem)] items-end gap-[3px] border-b border-line-strong" onMouseLeave={() => setHover(null)}>
             {data.map((point, index) => (
               <div

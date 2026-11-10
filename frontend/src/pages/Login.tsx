@@ -10,11 +10,14 @@ import { Field, Input } from '../components/ui/Field'
 import { API_URL, errorMessage } from '../lib/api'
 import { useAuth } from '../store/auth'
 
+// Demo sign-in is shown in development, or in a hosted demo built with VITE_DEMO_ACCOUNTS=true.
+const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_DEMO_ACCOUNTS === 'true'
+const DEMO_PASSWORD = (import.meta.env.VITE_DEMO_PASSWORD as string | undefined) ?? 'infera-demo-2026'
 const DEMO_ACCOUNTS = [
-  { username: 'ananya', role: 'Founder' },
-  { username: 'tomas', role: 'HR' },
-  { username: 'wei', role: 'PM' },
-  { username: 'ifeoma', role: 'Employee' },
+  { username: 'ananya', name: 'Ananya', role: 'Founder' },
+  { username: 'tomas', name: 'Tomás', role: 'HR' },
+  { username: 'wei', name: 'Wei', role: 'PM' },
+  { username: 'ifeoma', name: 'Ifeoma', role: 'Employee' },
 ]
 
 /** A field of indexed passages. A handful light up, like a query finding its matches. */
@@ -56,16 +59,11 @@ export default function Login() {
 
   if (access) return <Navigate to={from} replace />
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
-    if (!username.trim() || !password) {
-      setError('Enter your username and password.')
-      return
-    }
+  const signIn = async (name: string, secret: string) => {
     setLoading(true)
     setError(null)
     try {
-      const { data } = await axios.post(`${API_URL}/token/`, { username: username.trim(), password })
+      const { data } = await axios.post(`${API_URL}/token/`, { username: name.trim(), password: secret })
       useAuth.getState().setSession(data)
       navigate(from, { replace: true })
     } catch (err) {
@@ -75,6 +73,15 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    if (!username.trim() || !password) {
+      setError('Enter your username and password.')
+      return
+    }
+    void signIn(username, password)
   }
 
   return (
@@ -133,29 +140,29 @@ export default function Login() {
             </Button>
           </form>
 
-          {import.meta.env.DEV && (
-            <div className="mt-10 rounded-control border border-dashed border-line p-4">
-              <p className="text-xs font-medium text-muted">Demo accounts (development only)</p>
-              <p className="mt-1 text-xs text-subtle">
-                Created by <code className="font-mono">manage.py seed_demo</code>. Password <code className="font-mono">infera-demo-2026</code>.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
+          {SHOW_DEMO && (
+            <section className="mt-10 border-t border-line pt-6" aria-labelledby="demo-heading">
+              <h3 id="demo-heading" className="text-[13px] font-medium text-fg">Try a demo account</h3>
+              <p className="mt-1 text-[13px] leading-5 text-muted">Each role sees a different slice of the workspace.</p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 {DEMO_ACCOUNTS.map((account) => (
                   <button
                     key={account.username}
                     type="button"
+                    disabled={loading}
                     onClick={() => {
                       setUsername(account.username)
-                      setPassword('infera-demo-2026')
-                      setError(null)
+                      setPassword(DEMO_PASSWORD)
+                      void signIn(account.username, DEMO_PASSWORD)
                     }}
-                    className="rounded-chip border border-line bg-elevated px-2 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-fg"
+                    className="flex flex-col items-start rounded-control border border-line bg-surface px-3 py-2.5 text-left transition-[border-color,transform] hover:border-line-strong active:scale-[0.98] disabled:opacity-60"
                   >
-                    {account.username} <span className="text-subtle">{account.role}</span>
+                    <span className="text-sm font-medium text-fg">{account.name}</span>
+                    <span className="text-xs text-subtle">{account.role}</span>
                   </button>
                 ))}
               </div>
-            </div>
+            </section>
           )}
         </motion.div>
       </main>

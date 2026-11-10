@@ -28,8 +28,8 @@ function LogRow({ log, onUser }: { log: LogEntry; onUser: (username: string) => 
           <p className="text-sm leading-6 text-muted">
             {log.username ? (
               <button onClick={() => onUser(log.username!)} className="inline-flex items-center gap-1.5 font-medium text-fg hover:underline">
-                <Avatar name={log.username} size="xs" className="translate-y-[1px]" />
-                {log.username}
+                <Avatar name={log.display_name ?? log.username} seed={log.username} size="xs" className="translate-y-[1px]" />
+                {log.display_name ?? log.username}
               </button>
             ) : (
               <span className="font-medium text-fg">System</span>

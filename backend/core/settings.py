@@ -5,6 +5,7 @@ import sys
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 
@@ -29,9 +30,14 @@ def env_list(name: str, default: str) -> list[str]:
 
 TESTING = "test" in sys.argv
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", "django-insecure-secure-rag-workspace-dev-key")
-DEBUG = env_bool("DJANGO_DEBUG", True)
+# Production is the default. Local development sets DJANGO_DEBUG=True in .env.
+DEBUG = env_bool("DJANGO_DEBUG", False)
+_DEV_SECRET_KEY = "django-insecure-secure-rag-workspace-dev-key"
+SECRET_KEY = env("DJANGO_SECRET_KEY", _DEV_SECRET_KEY if (DEBUG or TESTING) else "")
+if not SECRET_KEY or (not DEBUG and not TESTING and SECRET_KEY.startswith("django-insecure")):
+    raise ImproperlyConfigured("Set DJANGO_SECRET_KEY to a long random value when DJANGO_DEBUG is off.")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "127.0.0.1,localhost")
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -120,6 +126,11 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": env("LOGIN_THROTTLE_RATE", "10/min"),
     },
+    # The browsable API is a development aid; production serves JSON only.
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        *(["rest_framework.renderers.BrowsableAPIRenderer"] if DEBUG else []),
+    ],
 }
 
 SIMPLE_JWT = {
@@ -162,9 +173,18 @@ LLM_TIMEOUT_SECONDS = int(env("LLM_TIMEOUT_SECONDS", "300"))
 GEMINI_API_KEY = env("GEMINI_API_KEY", "")
 GEMINI_MODEL = env("GEMINI_MODEL", "gemini-2.5-flash")
 
-# Developer convenience: lets a signed-in user switch their own role to try
-# each permission level. Never enable this in production.
-ALLOW_ROLE_SWITCH = env_bool("ALLOW_ROLE_SWITCH", DEBUG)
+# --- Security headers (production) -------------------------------------------------
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+if not DEBUG:
+    SESSION_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)
+    CSRF_COOKIE_SECURE = env_bool("SECURE_COOKIES", True)
+    SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
+    SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "0"))
+    if env_bool("USE_X_FORWARDED_PROTO", False):
+        SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 LOGGING = {
     "version": 1,
@@ -172,6 +192,7 @@ LOGGING = {
     "formatters": {"simple": {"format": "[{levelname}] {name}: {message}", "style": "{"}},
     "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "simple"}},
     "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
         "infera": {"handlers": ["console"], "level": env("INFERA_LOG_LEVEL", "INFO"), "propagate": False},
     },
 }

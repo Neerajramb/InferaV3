@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
@@ -8,7 +7,6 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from workspace.audit import audit
 
-from .models import normalize_role
 from .roles import CanAddMembers, IsFounder
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -55,24 +53,6 @@ class PasswordChangeView(APIView):
         request.user.save(update_fields=["password"])
         audit(request.user, "password_changed")
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class DevRoleSwitchView(APIView):
-    """Lets a developer preview each role. Disabled unless ALLOW_ROLE_SWITCH is on."""
-
-    def patch(self, request):
-        if not settings.ALLOW_ROLE_SWITCH:
-            return Response({"detail": "Role switching is disabled on this server."}, status=status.HTTP_403_FORBIDDEN)
-        raw_role = request.data.get("role")
-        if not raw_role:
-            return Response({"detail": "No role provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = request.user
-        previous = user.role
-        user.role = normalize_role(raw_role)
-        user.save(update_fields=["role"])
-        audit(user, "role_switched", previous=previous, new_role=user.role)
-        return Response(MeSerializer(user).data)
 
 
 class TeamListCreateView(generics.ListCreateAPIView):

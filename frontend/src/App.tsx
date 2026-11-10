@@ -69,7 +69,7 @@ function ThemedToaster() {
 export default function App() {
   useSessionBootstrap()
   return (
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Suspense fallback={<div className="min-h-[100dvh] bg-bg" />}>
         <Routes>
           <Route path="/" element={<Landing />} />

@@ -53,7 +53,7 @@ api.interceptors.response.use(
 /** Turn any API error into one readable sentence. */
 export function errorMessage(error: unknown, fallback = 'Something went wrong. Please try again.'): string {
   if (axios.isAxiosError(error)) {
-    if (!error.response) return 'Cannot reach the Infera server. Check that the backend is running.'
+    if (!error.response) return "Can't reach the server. Check your connection and try again."
     const data = error.response.data as unknown
     if (typeof data === 'string') return fallback
     if (data && typeof data === 'object') {
@@ -68,18 +68,31 @@ export function errorMessage(error: unknown, fallback = 'Something went wrong. P
   return fallback
 }
 
-/** Fetch an authenticated file and open it in a new tab or save it. */
+/**
+ * Fetch an authenticated file and open it in a new tab or save it.
+ * The tab is opened before the request so popup blockers treat it as a user action.
+ */
 export async function openDocument(id: number, title: string, download = false) {
-  const response = await api.get(`/documents/${id}/download/`, {
-    params: download ? { download: 1 } : undefined,
-    responseType: 'blob',
-  })
-  const url = URL.createObjectURL(response.data as Blob)
-  if (download) {
-    const link = Object.assign(document.createElement('a'), { href: url, download: title })
-    link.click()
-  } else {
-    window.open(url, '_blank', 'noopener')
+  const tab = download ? null : window.open('', '_blank')
+  try {
+    const response = await api.get(`/documents/${id}/download/`, {
+      params: download ? { download: 1 } : undefined,
+      responseType: 'blob',
+    })
+    const url = URL.createObjectURL(response.data as Blob)
+    if (download) {
+      const link = Object.assign(document.createElement('a'), { href: url, download: title })
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } else if (tab) {
+      tab.location.href = url
+    } else {
+      window.open(url, '_blank', 'noopener')
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (error) {
+    tab?.close()
+    throw error
   }
-  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

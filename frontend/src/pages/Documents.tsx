@@ -38,8 +38,9 @@ import { keys, useDocuments, useFolderTree, useSystemStatus } from '../hooks/que
 import { useFolderActions } from '../hooks/useFolderActions'
 import { useSpaceInfo, useSpaceParam } from '../hooks/useSpaces'
 import { api, errorMessage, openDocument } from '../lib/api'
-import { cn, formatBytes, relativeTime } from '../lib/format'
+import { cn, formatBytes, plural, relativeTime } from '../lib/format'
 import type { DocumentItem } from '../lib/types'
+import { useAuth } from '../store/auth'
 
 interface UploadJob {
   id: string
@@ -72,6 +73,7 @@ export default function Documents() {
   const folder = folderParam && /^\d+$/.test(folderParam) ? Number(folderParam) : null
   const { project, projects, name: spaceName, canContribute } = useSpaceInfo(space)
   const queryClient = useQueryClient()
+  const meId = useAuth((s) => s.user?.id)
 
   const { data: folders = [] } = useFolderTree(space === 'all' ? 'personal' : space)
   const docsQuery = useDocuments(space, space === 'all' ? undefined : folder ?? 'root')
@@ -352,7 +354,7 @@ export default function Documents() {
                     <button onClick={() => setFolder(sub.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-elevated/50">
                       <span className="flex h-9 w-9 items-center justify-center rounded-[9px] border border-line bg-sunken text-muted"><FolderSimpleIcon className="h-4 w-4" /></span>
                       <span className="min-w-0 flex-1 truncate text-sm font-medium">{sub.name}</span>
-                      <span className="text-xs text-subtle">{sub.documents_count} {sub.documents_count === 1 ? 'file' : 'files'}</span>
+                      <span className="text-xs text-subtle">{plural(sub.documents_count, 'file')}</span>
                       <CaretRightIcon className="h-4 w-4 text-subtle" />
                     </button>
                   </motion.li>
@@ -364,8 +366,8 @@ export default function Documents() {
                       <span className="block truncate text-sm font-medium group-hover:underline group-hover:decoration-line-strong group-hover:underline-offset-4">{doc.title}</span>
                       <span className="mt-0.5 block truncate text-xs text-subtle">
                         {formatBytes(doc.file_size)}
-                        {doc.status === 'ready' ? `, ${doc.chunk_count} passages` : ''}
-                        {space === 'all' ? `, ${doc.project_name ?? 'Personal'}` : ''}
+                        {doc.status === 'ready' ? `, ${plural(doc.chunk_count, 'passage')}` : ''}
+                        {space === 'all' ? `, ${doc.project_name ?? (doc.uploaded_by.id === meId ? 'Personal' : `${doc.uploaded_by.display_name}, personal`)}` : ''}
                       </span>
                       {doc.status === 'failed' && doc.error && <span className="mt-1 block text-xs text-danger">{doc.error}</span>}
                     </button>

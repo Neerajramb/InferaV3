@@ -58,6 +58,8 @@
 
   body {
     @apply bg-bg font-sans text-fg antialiased;
+    /* Long file names and URLs wrap instead of widening the page. */
+    overflow-wrap: break-word;
     font-feature-settings: 'ss01', 'cv11';
   }
 

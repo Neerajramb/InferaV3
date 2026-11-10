@@ -1,5 +1,4 @@
 import {
-  ArrowsLeftRightIcon,
   FileArrowUpIcon,
   FolderPlusIcon,
   KeyIcon,
@@ -37,7 +36,6 @@ export function describeLog(log: LogEntry): { icon: Icon; text: string } {
     case 'member_role_changed': return { icon: UserGearIcon, text: `made ${str(m.username)} ${str(m.role)} on ${str(m.project)}` }
     case 'member_created': return { icon: UserPlusIcon, text: `added ${str(m.username)} to the workspace as ${str(m.role)}` }
     case 'member_updated': return { icon: UserGearIcon, text: `updated ${str(m.username)}${m.role ? ` to ${str(m.role)}` : ''}${m.is_active === false ? ' (deactivated)' : ''}` }
-    case 'role_switched': return { icon: ArrowsLeftRightIcon, text: `previewed the ${str(m.new_role)} role` }
     case 'password_changed': return { icon: KeyIcon, text: 'changed their password' }
     default: return { icon: SparkleIcon, text: log.action.replace(/_/g, ' ') }
   }

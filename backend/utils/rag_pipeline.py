@@ -137,7 +137,8 @@ def retrieve(user, query: str, scope: Scope, top_k: int | None = None) -> list[d
     candidates = vector_store.search(embedding_service.embed_text(query), allowed, top_k=max(top_k * 4, 24))
     terms = {t for t in tokenize(query) if t not in STOPWORDS}
     for hit in candidates:
-        hit["relevance"] = hit["score"] + LEXICAL_WEIGHT * _lexical_overlap(terms, hit["text"])
+        # The title counts too, so "summarize badge-policy.txt" favours that file.
+        hit["relevance"] = hit["score"] + LEXICAL_WEIGHT * _lexical_overlap(terms, f"{hit['title']} {hit['text']}")
     ranked = sorted(candidates, key=lambda h: h["relevance"], reverse=True)
     if not ranked:
         return []

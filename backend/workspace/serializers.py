@@ -93,6 +93,14 @@ class FolderSerializer(serializers.ModelSerializer):
                 if self.instance and node.pk == self.instance.pk:
                     raise serializers.ValidationError("A folder can't be moved inside itself.")
                 node = node.parent
+        name = attrs.get("name", getattr(self.instance, "name", ""))
+        siblings = Folder.objects.filter(parent=parent, project=project, name__iexact=name)
+        if project is None:
+            siblings = siblings.filter(created_by=user)
+        if self.instance is not None:
+            siblings = siblings.exclude(pk=self.instance.pk)
+        if siblings.exists():
+            raise serializers.ValidationError({"name": "A folder with that name already exists here."})
         return attrs
 
 
@@ -140,9 +148,20 @@ class DocumentUpdateSerializer(serializers.ModelSerializer):
         model = Document
         fields = ("title", "folder")
 
+    def validate_title(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Give the document a name.")
+        return value
+
     def validate_folder(self, folder):
-        if folder is not None and folder.project_id != self.instance.project_id:
+        if folder is None:
+            return folder
+        if folder.project_id != self.instance.project_id:
             raise serializers.ValidationError("That folder belongs to a different space.")
+        user = _request_user(self)
+        if user is None or not can_edit_folder(user, folder):
+            raise serializers.ValidationError("You can't move files into that folder.")
         return folder
 
 
@@ -173,6 +192,8 @@ class NoteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Notes can't move between spaces.")
         if folder is not None and folder.project_id != (project.id if project else None):
             raise serializers.ValidationError("That folder belongs to a different space.")
+        if "folder" in attrs and folder is not None and not can_edit_folder(user, folder):
+            raise serializers.ValidationError("You can't add notes to that folder.")
         if not (attrs.get("content", getattr(self.instance, "content", "")) or "").strip():
             raise serializers.ValidationError({"content": "Write something before saving."})
         return attrs
@@ -180,11 +201,12 @@ class NoteSerializer(serializers.ModelSerializer):
 
 class LogSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source="user.username", read_only=True, default=None)
+    display_name = serializers.CharField(source="user.display_name", read_only=True, default=None)
     role = serializers.CharField(source="user.role", read_only=True, default=None)
 
     class Meta:
         model = Log
-        fields = ("id", "action", "username", "role", "timestamp", "metadata")
+        fields = ("id", "action", "username", "display_name", "role", "timestamp", "metadata")
 
 
 class ChatMessageSerializer(serializers.ModelSerializer):

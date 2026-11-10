@@ -72,7 +72,7 @@ export default function Notes() {
     if (!node) return
     node.style.height = 'auto'
     node.style.height = `${Math.max(node.scrollHeight, 320)}px`
-  }, [draft.content, mode, editing])
+  })
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase()
@@ -131,7 +131,7 @@ export default function Notes() {
       void queryClient.invalidateQueries({ queryKey: ['notes'] })
       void queryClient.invalidateQueries({ queryKey: ['folders'] })
       void queryClient.invalidateQueries({ queryKey: keys.dashboard })
-      toast.success('Note saved and indexed')
+      toast.success('Note saved')
     } catch (error) {
       toast.error(errorMessage(error))
     } finally {
@@ -306,7 +306,8 @@ export default function Notes() {
                     readOnly={readOnly}
                     placeholder={`Write in ${space === 'all' ? 'your personal space' : spaceName}. Markdown headings, lists and tables are supported.`}
                     aria-label="Note content"
-                    className="mt-5 w-full resize-none bg-transparent font-sans text-[15px] leading-7 text-fg placeholder:text-subtle focus:outline-none"
+                    rows={12}
+                    className="mt-5 min-h-[320px] w-full resize-none overflow-hidden bg-transparent font-sans text-[15px] leading-7 text-fg placeholder:text-subtle focus:outline-none"
                   />
                 ) : (
                   <div className="prose-chat mt-5 min-h-[320px]">
@@ -326,11 +327,13 @@ export default function Notes() {
         footer={
           <>
             <Button variant="ghost" onClick={() => folderActions.setRenaming(null)}>Cancel</Button>
-            <Button variant="primary" onClick={() => folderActions.renaming && void folderActions.rename(folderActions.renaming, renameDraft.trim())}>Save</Button>
+            <Button variant="primary" disabled={!renameDraft.trim()} onClick={() => folderActions.renaming && void folderActions.rename(folderActions.renaming, renameDraft.trim())}>Save</Button>
           </>
         }
       >
-        <Input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} aria-label="Folder name" data-autofocus />
+        <form onSubmit={(e) => { e.preventDefault(); if (folderActions.renaming && renameDraft.trim()) void folderActions.rename(folderActions.renaming, renameDraft.trim()) }}>
+          <Input value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} aria-label="Folder name" data-autofocus maxLength={255} />
+        </form>
       </Dialog>
     </div>
   )

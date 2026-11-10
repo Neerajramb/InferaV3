@@ -1,4 +1,3 @@
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.utils import timezone
@@ -25,14 +24,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class MeSerializer(UserSerializer):
-    dev_role_switch = serializers.SerializerMethodField()
-
     class Meta(UserSerializer.Meta):
-        fields = (*UserSerializer.Meta.fields, "dev_role_switch")
         read_only_fields = ("id", "username", "role", "last_seen", "online", "is_active", "date_joined")
-
-    def get_dev_role_switch(self, obj) -> bool:
-        return bool(settings.ALLOW_ROLE_SWITCH)
 
 
 class ProfileUpdateSerializer(serializers.ModelSerializer):

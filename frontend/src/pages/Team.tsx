@@ -18,6 +18,7 @@ import { SkeletonRows } from '../components/ui/Skeleton'
 import { keys, useTeam } from '../hooks/queries'
 import { api, errorMessage } from '../lib/api'
 import { cn, formatDate, relativeTime } from '../lib/format'
+import { copyText } from '../lib/clipboard'
 import { can, ROLE_SUMMARY, ROLES } from '../lib/rbac'
 import type { Role, User } from '../lib/types'
 import { useAuth } from '../store/auth'
@@ -104,8 +105,8 @@ function AddPersonSheet({ open, onClose }: { open: boolean; onClose: () => void 
           <Button
             icon={copied ? <CheckIcon className="h-4 w-4 text-success" /> : <CopyIcon className="h-4 w-4" />}
             onClick={async () => {
-              await navigator.clipboard.writeText(`Username: ${created.username}\nPassword: ${created.password}`)
-              setCopied(true)
+              if (await copyText(`Username: ${created.username}\nPassword: ${created.password}`)) setCopied(true)
+              else toast.error("Couldn't copy. Select the details and copy them manually.")
             }}
           >
             {copied ? 'Copied' : 'Copy both'}
@@ -150,9 +151,11 @@ export default function Team() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return people.filter(
-      (p) => (roleFilter === 'all' || p.role === roleFilter) && (!q || p.display_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || p.username.includes(q)),
-    )
+    return people
+      .filter(
+        (p) => (roleFilter === 'all' || p.role === roleFilter) && (!q || p.display_name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q) || p.username.toLowerCase().includes(q)),
+      )
+      .sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: 'base' }))
   }, [people, roleFilter, search])
 
   const online = people.filter((p) => p.online && p.is_active).length

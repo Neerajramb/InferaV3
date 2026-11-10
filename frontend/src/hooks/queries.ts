@@ -76,6 +76,7 @@ export const useNotes = (space: Space) =>
     queryKey: keys.notes(space),
     queryFn: () => get<Note[]>('/notes/', { space: spaceParam(space) }),
     placeholderData: keepPreviousData,
+    refetchInterval: (query) => (isIndexing(query.state.data) ? 2000 : false),
   })
 
 export const useSessions = () => useQuery({ queryKey: keys.sessions, queryFn: () => get<ChatSession[]>('/chat/sessions/') })

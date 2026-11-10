@@ -63,7 +63,7 @@ export function AccessBento() {
             <thead>
               <tr className="text-left text-xs text-subtle">
                 <th className="pb-2 font-medium"><span className="sr-only">Capability</span></th>
-                {ROLES.map((r) => <th key={r} className="pb-2 text-center font-medium">{r === 'Employee' ? 'Staff' : r}</th>)}
+                {ROLES.map((r) => <th key={r} className="pb-2 text-center font-medium">{r}</th>)}
               </tr>
             </thead>
             <tbody>

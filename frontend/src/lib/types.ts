@@ -16,9 +16,7 @@ export interface User {
   date_joined: string
 }
 
-export interface Me extends User {
-  dev_role_switch: boolean
-}
+export type Me = User
 
 export interface ProjectMember {
   id: number
@@ -135,6 +133,7 @@ export interface LogEntry {
   id: number
   action: string
   username: string | null
+  display_name: string | null
   role: Role | null
   timestamp: string
   metadata: Record<string, unknown>

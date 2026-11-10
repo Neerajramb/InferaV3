@@ -58,11 +58,23 @@ npm run build                          # production build
 
 All settings are environment variables; see `backend/.env.example`. The important ones:
 
+- `DJANGO_DEBUG`: defaults to `False`. The example file turns it on for local development.
+- `DJANGO_SECRET_KEY`: required whenever debug is off; the server refuses to start without it.
 - `LLM_PROVIDER`: `auto` (default) uses Ollama when it is reachable and passage quoting otherwise. `gemini` is opt-in only, because it sends retrieved text to Google.
-- `ALLOW_ROLE_SWITCH`: lets a signed-in user preview other roles. It defaults to on in debug mode and must stay off in production.
-- `CORS_ALLOWED_ORIGINS`, `DJANGO_SECRET_KEY`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`: set these before deploying.
+- `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`: the hostnames the API and the frontend are served from.
+
+The frontend reads `VITE_API_URL` at build time (see `frontend/.env.example`).
 
 Uploaded files are served only through an authenticated download endpoint, never as public media URLs.
+
+## Deploying
+
+1. Set `DJANGO_DEBUG=False`, a long random `DJANGO_SECRET_KEY`, and your real hostnames in `backend/.env`.
+2. Behind HTTPS, also set `SECURE_SSL_REDIRECT=True`, `SECURE_HSTS_SECONDS` and, if a proxy terminates TLS, `USE_X_FORWARDED_PROTO=True`.
+3. Run `python manage.py check --deploy`, `migrate` and `collectstatic`, then serve `core.wsgi` with a WSGI server such as gunicorn or waitress.
+4. Build the frontend with `VITE_API_URL` pointing at the API and serve `frontend/dist` as static files, falling back to `index.html` for client-side routes.
+
+In production the API returns JSON only (the browsable API is disabled), cookies are marked secure, and responses carry `nosniff`, `same-origin` referrer and `DENY` framing headers.
 
 ## Project layout
 

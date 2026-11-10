@@ -1,8 +1,8 @@
-import { useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { BooksIcon, MagnifyingGlassIcon, NoteIcon, PlusIcon, SparkleIcon, StackIcon, TrashIcon, UserMinusIcon } from '@phosphor-icons/react'
+import { ArrowRightIcon, BooksIcon, MagnifyingGlassIcon, NoteIcon, PlusIcon, SparkleIcon, StackIcon, TrashIcon, UserMinusIcon } from '@phosphor-icons/react'
 import { toast } from 'sonner'
 
 import { Avatar } from '../components/ui/Avatar'
@@ -18,11 +18,18 @@ import { keys, useProjects, useTeam } from '../hooks/queries'
 import { api, errorMessage } from '../lib/api'
 import { cn, formatDate } from '../lib/format'
 import { can } from '../lib/rbac'
-import type { Project, ProjectRole } from '../lib/types'
+import type { Project, ProjectMember, ProjectRole } from '../lib/types'
 import { useAuth } from '../store/auth'
 
+const ROLE_ORDER: Record<ProjectRole, number> = { owner: 0, editor: 1, viewer: 2 }
+
+/** Owner first, then editors, then viewers, alphabetical within each. */
+function sortMembers(members: ProjectMember[]) {
+  return [...members].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || a.user.display_name.localeCompare(b.user.display_name))
+}
+
 function MemberStack({ project }: { project: Project }) {
-  const shown = project.members.slice(0, 4)
+  const shown = sortMembers(project.members).slice(0, 4)
   const extra = project.members.length - shown.length
   return (
     <div className="flex items-center">
@@ -120,6 +127,13 @@ function ProjectSheet({ project, onClose }: { project: Project | null; onClose: 
   const [newRole, setNewRole] = useState<ProjectRole>('editor')
   const [busy, setBusy] = useState(false)
 
+  // Each project opens fresh, not in the previous project's edit form.
+  useEffect(() => {
+    setEditing(false)
+    setNewMember('')
+    setNewRole('editor')
+  }, [project?.id])
+
   const refresh = () => queryClient.invalidateQueries({ queryKey: keys.projects })
   const run = async (action: () => Promise<unknown>, success?: string) => {
     setBusy(true)
@@ -149,7 +163,7 @@ function ProjectSheet({ project, onClose }: { project: Project | null; onClose: 
               void run(() => api.patch(`/projects/${project.id}/`, form), 'Project updated').then(() => setEditing(false))
             }}
           >
-            <Field label="Name">{(p) => <Input {...p} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-autofocus />}</Field>
+            <Field label="Name">{(p) => <Input {...p} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-autofocus maxLength={255} required />}</Field>
             <Field label="Description">{(p) => <Textarea {...p} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />}</Field>
             <div className="flex gap-2">
               <Button type="submit" variant="primary" loading={busy}>Save</Button>
@@ -171,11 +185,15 @@ function ProjectSheet({ project, onClose }: { project: Project | null; onClose: 
           {[
             { to: `/documents?space=${project.id}`, icon: <BooksIcon className="h-4 w-4" />, label: 'Documents', value: project.document_count },
             { to: `/notes?space=${project.id}`, icon: <NoteIcon className="h-4 w-4" />, label: 'Notes', value: project.note_count },
-            { to: `/chat?new=1&project=${project.id}`, icon: <SparkleIcon className="h-4 w-4 text-accent-ink" />, label: 'Ask', value: null },
+            { to: `/chat?new=1&project=${project.id}`, icon: <SparkleIcon className="h-4 w-4 text-accent-ink" />, label: 'Ask Infera', value: null },
           ].map((link) => (
             <Link key={link.label} to={link.to} className="rounded-control border border-line bg-sunken/50 px-3 py-3 transition-[border-color,transform] hover:border-line-strong active:scale-[0.98]">
               <span className="flex items-center gap-1.5 text-[13px] text-muted">{link.icon} {link.label}</span>
-              <span className="mt-1 block text-lg font-semibold tabular">{link.value ?? 'Chat'}</span>
+              {link.value === null ? (
+                <span className="mt-1 flex h-7 items-center text-sm font-medium text-fg">Start a chat <ArrowRightIcon className="ml-1 h-3.5 w-3.5" /></span>
+              ) : (
+                <span className="mt-1 block text-lg font-semibold tabular">{link.value}</span>
+              )}
             </Link>
           ))}
         </div>
@@ -183,7 +201,7 @@ function ProjectSheet({ project, onClose }: { project: Project | null; onClose: 
         <section>
           <h3 className="text-sm font-semibold">Members</h3>
           <ul className="mt-3 divide-y divide-line">
-            {project.members.map((member) => (
+            {sortMembers(project.members).map((member) => (
               <li key={member.id} className="flex items-center gap-3 py-2.5">
                 <Avatar name={member.user.display_name} seed={member.user.username} size="sm" online={member.user.online} />
                 <span className="min-w-0 flex-1">

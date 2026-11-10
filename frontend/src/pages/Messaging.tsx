@@ -33,12 +33,12 @@ export default function Messaging() {
     const byId = new Map(conversations.map((c) => [c.user_id, c]))
     const q = filter.trim().toLowerCase()
     return team
-      .filter((u) => u.id !== me.id && (!q || u.display_name.toLowerCase().includes(q) || u.username.includes(q)))
+      .filter((u) => u.id !== me.id && (!q || u.display_name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q)))
       .map((u) => ({ user: u, conversation: byId.get(u.id) }))
       .sort((a, b) => {
         const at = a.conversation?.last_message?.created_at ?? ''
         const bt = b.conversation?.last_message?.created_at ?? ''
-        return bt.localeCompare(at) || a.user.display_name.localeCompare(b.user.display_name)
+        return bt.localeCompare(at) || a.user.display_name.localeCompare(b.user.display_name, undefined, { sensitivity: 'base' })
       })
   }, [team, conversations, filter, me.id])
 
@@ -127,7 +127,7 @@ export default function Messaging() {
           <EmptyState className="flex-1" icon={<ChatsCircleIcon className="h-6 w-6" />} title="Pick someone to message" description="Direct messages are only visible to you and the person you are talking to." />
         ) : (
           <>
-            <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line px-4">
+            <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-4">
               <button onClick={() => select(null)} className="-ml-1 flex h-9 w-9 items-center justify-center rounded-control text-muted hover:bg-elevated md:hidden" aria-label="Back to people">
                 <ArrowLeftIcon />
               </button>

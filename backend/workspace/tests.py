@@ -16,7 +16,7 @@ PASSWORD = "a-strong-test-passphrase"
 MEDIA = tempfile.mkdtemp(prefix="infera-media-")
 
 
-@override_settings(MEDIA_ROOT=MEDIA, ALLOW_ROLE_SWITCH=False)
+@override_settings(MEDIA_ROOT=MEDIA)
 class WorkspaceTestCase(APITestCase):
     @classmethod
     def tearDownClass(cls):
@@ -55,20 +55,6 @@ class AuthTests(WorkspaceTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["user"]["role"], "PM")
         self.assertTrue(Log.objects.filter(action="login", user=self.pm).exists())
-
-    def test_role_switch_is_disabled_by_default(self):
-        self.as_user(self.alice)
-        response = self.client.patch("/api/auth/profile/update-role/", {"role": "Founder"})
-        self.assertEqual(response.status_code, 403)
-        self.alice.refresh_from_db()
-        self.assertEqual(self.alice.role, "Employee")
-
-    @override_settings(ALLOW_ROLE_SWITCH=True)
-    def test_role_switch_normalizes_role_when_enabled(self):
-        self.as_user(self.alice)
-        response = self.client.patch("/api/auth/profile/update-role/", {"role": "pm"})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["role"], "PM")
 
     def test_only_founder_and_hr_can_add_people(self):
         payload = {"username": "newhire", "password": PASSWORD, "role": "Employee"}
@@ -139,6 +125,31 @@ class DocumentTests(WorkspaceTestCase):
         self.as_user(self.founder)
         self.assertEqual(self.client.get(f"/api/documents/{doc_id}/").status_code, 200)
 
+    def test_personal_space_only_lists_own_files(self):
+        self.upload(self.alice, "salary.txt", "Confidential salary bands.")
+        self.upload(self.founder, "board.txt", "Board meeting notes.")
+        self.as_user(self.founder)
+        titles = {d["title"] for d in self.client.get("/api/documents/?space=personal").data}
+        self.assertEqual(titles, {"board.txt"})
+
+    def test_rejects_non_numeric_folder_filter(self):
+        self.as_user(self.alice)
+        self.assertEqual(self.client.get("/api/documents/?folder=abc").status_code, 400)
+
+    def test_download_keeps_extension_after_rename(self):
+        doc_id = self.upload(self.alice, "plan.txt", "Quarterly plan body.").data["id"]
+        self.client.patch(f"/api/documents/{doc_id}/", {"title": "Q3 plan"})
+        response = self.client.get(f"/api/documents/{doc_id}/download/?download=1")
+        self.assertIn('filename="Q3 plan.txt"', response["Content-Disposition"])
+
+    def test_cannot_move_file_into_someone_elses_folder(self):
+        doc_id = self.upload(self.alice, "a.txt", "alpha").data["id"]
+        self.as_user(self.bob)
+        folder = self.client.post("/api/folders/", {"name": "Bob's"}).data["id"]
+        self.as_user(self.alice)
+        response = self.client.patch(f"/api/documents/{doc_id}/", {"folder": folder})
+        self.assertEqual(response.status_code, 400)
+
     def test_delete_removes_vectors(self):
         doc_id = self.upload(self.alice, "a.txt", "Quarterly planning happens in March.").data["id"]
         self.assertGreater(vector_store.count(), 0)
@@ -188,6 +199,14 @@ class ChatTests(WorkspaceTestCase):
         self.assertEqual(ChatSession.objects.get(pk=first["session_id"]).messages.count(), 4)
         self.assertEqual(Query.objects.filter(user=self.alice).count(), 2)
 
+    def test_sessions_are_listed_newest_first(self):
+        older = ChatSession.objects.create(user=self.alice, title="Older")
+        newer = ChatSession.objects.create(user=self.alice, title="Newer")
+        ChatSession.objects.filter(pk=older.pk).update(updated_at=newer.updated_at.replace(year=2020))
+        self.as_user(self.alice)
+        ids = [s["id"] for s in self.client.get("/api/chat/sessions/").data]
+        self.assertEqual(ids, [newer.id, older.id])
+
     def test_cannot_use_someone_elses_session(self):
         session = ChatSession.objects.create(user=self.bob, title="Bob's")
         self.as_user(self.alice)
@@ -224,6 +243,11 @@ class DashboardTests(WorkspaceTestCase):
             self.client.post("/api/documents/upload/", {"file": SimpleUploadedFile(name, b"text body"), "folder": folder}, format="multipart")
         tree = self.client.get("/api/folders/tree/?space=personal").data
         self.assertEqual(tree[0]["documents_count"], 2)
+
+    def test_duplicate_folder_names_are_rejected(self):
+        self.as_user(self.alice)
+        self.assertEqual(self.client.post("/api/folders/", {"name": "Plans"}).status_code, 201)
+        self.assertEqual(self.client.post("/api/folders/", {"name": "plans"}).status_code, 400)
 
 
 class MessagingTests(WorkspaceTestCase):

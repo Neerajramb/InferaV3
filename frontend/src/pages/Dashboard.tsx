@@ -11,6 +11,7 @@ import {
   SparkleIcon,
   WarningCircleIcon,
 } from '@phosphor-icons/react'
+import { toast } from 'sonner'
 
 import { describeLog } from '../components/app/ActivityItem'
 import { AssistantDot, assistantLabel } from '../components/app/AssistantStatus'
@@ -21,13 +22,13 @@ import { EmptyState, ErrorState } from '../components/ui/EmptyState'
 import { CountUp, Page, stagger } from '../components/ui/misc'
 import { Skeleton } from '../components/ui/Skeleton'
 import { useDashboard } from '../hooks/queries'
-import { errorMessage } from '../lib/api'
+import { errorMessage, openDocument } from '../lib/api'
 import { cn, greeting, relativeTime } from '../lib/format'
 import type { Dashboard as DashboardData } from '../lib/types'
 
 function Panel({ title, action, children, className }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <motion.section variants={stagger.item} className={cn('rounded-panel border border-line bg-surface p-5 shadow-panel', className)}>
+    <motion.section variants={stagger.item} className={cn('flex min-w-0 flex-col rounded-panel border border-line bg-surface p-5 shadow-panel', className)}>
       <div className="mb-4 flex items-center justify-between gap-4">
         <h2 className="text-sm font-semibold text-fg">{title}</h2>
         {action}
@@ -71,7 +72,7 @@ function Metrics({ data }: { data: DashboardData }) {
     { label: 'Projects', value: data.stats.projects, to: '/projects' },
     { label: 'Documents', value: data.stats.documents, to: '/documents?space=all' },
     { label: 'Notes', value: data.stats.notes, to: '/notes?space=all' },
-    { label: data.user.role === 'Founder' ? 'Questions, all users' : 'Questions asked', value: data.stats.queries, to: '/chat' },
+    { label: data.user.role === 'Founder' ? 'Questions (team)' : 'Questions asked', value: data.stats.queries, to: '/chat' },
     ...(data.stats.team !== null ? [{ label: 'People', value: data.stats.team, to: '/team' }] : []),
   ]
   return (
@@ -125,11 +126,11 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-5">
       <Skeleton className="h-[86px] w-full rounded-panel" />
-      <div className="grid gap-5 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <Skeleton className="h-64 rounded-panel lg:col-span-2" />
         <Skeleton className="h-64 rounded-panel" />
       </div>
-      <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.4fr_1fr]">
         <Skeleton className="h-72 rounded-panel" />
         <Skeleton className="h-72 rounded-panel" />
       </div>
@@ -163,11 +164,11 @@ export default function Dashboard() {
           <motion.div variants={stagger.container} initial="hidden" animate="show" className="space-y-5">
             <Metrics data={data} />
 
-            <div className="grid gap-5 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
               <Panel title="Questions per day" className="lg:col-span-2" action={<span className="text-xs text-subtle">Last 14 days</span>}>
                 <QueryChart data={data.query_series} />
               </Panel>
-              <div className="grid gap-5">
+              <div className="grid min-w-0 grid-cols-1 gap-5">
                 <Panel title="Index health">
                   <IndexHealth data={data} />
                 </Panel>
@@ -181,20 +182,22 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
               <Panel title="Recently added" action={<Link to="/documents?space=all" className="text-[13px] text-muted hover:text-fg">View all</Link>}>
                 {data.recent_documents.length ? (
                   <ul className="-mx-2">
                     {data.recent_documents.map((doc) => (
-                      <li key={doc.id} className="flex items-center gap-3 rounded-control px-2 py-2.5 transition-colors hover:bg-elevated/60">
+                      <li key={doc.id}>
+                        <button onClick={() => openDocument(doc.id, doc.title).catch((e) => toast.error(errorMessage(e)))} className="flex w-full items-center gap-3 rounded-control px-2 py-2.5 text-left transition-colors hover:bg-elevated/60">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] border border-line bg-sunken font-mono text-[10px] uppercase text-muted">{doc.extension || 'doc'}</span>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{doc.title}</p>
                           <p className="truncate text-xs text-subtle">
-                            {doc.project_name ?? 'Personal'} · {relativeTime(doc.created_at)}
+                            {doc.project_name ?? (doc.uploaded_by.id === data.user.id ? 'Personal' : `${doc.uploaded_by.display_name}, personal`)} · {relativeTime(doc.created_at)}
                           </p>
                         </div>
                         <StatusBadge status={doc.status} error={doc.error} />
+                        </button>
                       </li>
                     ))}
                   </ul>
@@ -203,7 +206,7 @@ export default function Dashboard() {
                 )}
               </Panel>
 
-              <div className="grid gap-5">
+              <div className="grid min-w-0 grid-cols-1 gap-5">
                 <Panel title="Recent chats" action={<Link to="/chat?new=1" className="text-[13px] text-muted hover:text-fg">New chat</Link>}>
                   {data.recent_sessions.length ? (
                     <ul className="-mx-2">
@@ -228,9 +231,9 @@ export default function Dashboard() {
                       const { icon: Icon, text } = describeLog(log)
                       return (
                         <li key={log.id} className="flex items-start gap-3 text-sm">
-                          {log.username ? <Avatar name={log.username} size="xs" className="mt-0.5" /> : <Icon className="mt-0.5 h-5 w-5 text-subtle" />}
+                          {log.username ? <Avatar name={log.display_name ?? log.username} seed={log.username} size="xs" className="mt-0.5" /> : <Icon className="mt-0.5 h-5 w-5 text-subtle" />}
                           <p className="min-w-0 flex-1 leading-5 text-muted">
-                            <span className="font-medium text-fg">{log.username ?? 'System'}</span> {text}
+                            <span className="font-medium text-fg">{log.display_name ?? log.username ?? 'System'}</span> {text}
                           </p>
                           <span className="shrink-0 text-xs text-subtle">{relativeTime(log.timestamp)}</span>
                         </li>

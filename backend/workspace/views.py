@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import mimetypes
 import time
 from datetime import timedelta
@@ -65,16 +66,22 @@ from .serializers import (
 )
 
 User = get_user_model()
+logger = logging.getLogger("infera.chat")
 
 
 # --- Helpers --------------------------------------------------------------------
 
 
-def filter_by_space(queryset, request, project_field: str = "project"):
-    """Apply ?space=personal|<project id>. Anything else returns all visible items."""
+def filter_by_space(queryset, request, project_field: str = "project", owner_field: str | None = None):
+    """Apply ?space=personal|<project id>. Anything else returns all visible items.
+
+    The personal space only ever holds the requester's own items, even for the
+    Founder, who can otherwise open everyone's files.
+    """
     space = request.query_params.get("space")
     if space == "personal":
-        return queryset.filter(**{f"{project_field}__isnull": True})
+        queryset = queryset.filter(**{f"{project_field}__isnull": True})
+        return queryset.filter(**{owner_field: request.user}) if owner_field else queryset
     if space and space.isdigit():
         if int(space) not in visible_project_ids(request.user):
             raise NotFound("Project not found.")
@@ -149,7 +156,7 @@ class DashboardView(APIView):
                 documents.select_related("uploaded_by", "project")[:5], many=True, context={"request": request}
             ).data,
             "recent_sessions": ChatSessionSerializer(
-                visible_sessions(user).annotate(message_count=Count("messages"))[:4], many=True
+                visible_sessions(user).annotate(message_count=Count("messages")).order_by("-updated_at")[:4], many=True
             ).data,
             "assistant": provider_status().as_dict(),
         })
@@ -295,7 +302,7 @@ class FolderListCreateView(generics.ListCreateAPIView):
     serializer_class = FolderSerializer
 
     def get_queryset(self):
-        return filter_by_space(visible_folders(self.request.user), self.request)
+        return filter_by_space(visible_folders(self.request.user), self.request, owner_field="created_by")
 
     def perform_create(self, serializer):
         folder = serializer.save(created_by=self.request.user)
@@ -324,7 +331,7 @@ class FolderDetailView(generics.RetrieveUpdateDestroyAPIView):
 class FolderTreeView(APIView):
     def get(self, request):
         user = request.user
-        folders = list(filter_by_space(visible_folders(user), request))
+        folders = list(filter_by_space(visible_folders(user), request, owner_field="created_by"))
         ids = [f.id for f in folders]
         children: dict[int, list[Folder]] = {}
         for folder in folders:
@@ -350,11 +357,16 @@ class DocumentListView(generics.ListAPIView):
     serializer_class = DocumentSerializer
 
     def get_queryset(self):
-        queryset = filter_by_space(visible_documents(self.request.user), self.request)
+        queryset = filter_by_space(visible_documents(self.request.user), self.request, owner_field="uploaded_by")
         params = self.request.query_params
         if "folder" in params:
             folder = params["folder"]
-            queryset = queryset.filter(folder__isnull=True) if folder in ("", "root") else queryset.filter(folder_id=folder)
+            if folder in ("", "root"):
+                queryset = queryset.filter(folder__isnull=True)
+            elif folder.isdigit():
+                queryset = queryset.filter(folder_id=int(folder))
+            else:
+                raise ValidationError({"folder": "Folder must be a number or 'root'."})
         if params.get("q"):
             queryset = queryset.filter(title__icontains=params["q"])
         if params.get("status"):
@@ -401,9 +413,14 @@ class DocumentDetailView(generics.RetrieveUpdateDestroyAPIView):
         document = self.get_object()
         if not can_delete_document(request.user, document):
             raise PermissionDenied("You can't edit this document.")
-        serializer = DocumentUpdateSerializer(document, data=request.data, partial=True)
+        serializer = DocumentUpdateSerializer(document, data=request.data, partial=True, context={"request": request})
         serializer.is_valid(raise_exception=True)
+        previous_title = document.title
         serializer.save()
+        if document.title != previous_title:
+            # Citations carry the title, so refresh the indexed passages.
+            schedule_document_index(document)
+            document.refresh_from_db()
         return Response(DocumentSerializer(document, context={"request": request}).data)
 
     def perform_destroy(self, instance):
@@ -419,11 +436,15 @@ class DocumentDownloadView(APIView):
         if not document.file or not Path(document.file.path).exists():
             raise NotFound("The file is missing on the server.")
         content_type = mimetypes.guess_type(document.file.name)[0] or "application/octet-stream"
+        filename = document.title
+        extension = Path(document.file.name).suffix
+        if extension and not filename.lower().endswith(extension.lower()):
+            filename += extension
         return FileResponse(
             document.file.open("rb"),
             content_type=content_type,
             as_attachment=request.query_params.get("download") == "1",
-            filename=document.title,
+            filename=filename,
         )
 
 
@@ -445,7 +466,7 @@ class NoteListCreateView(generics.ListCreateAPIView):
     serializer_class = NoteSerializer
 
     def get_queryset(self):
-        queryset = filter_by_space(visible_notes(self.request.user), self.request).select_related("user", "project")
+        queryset = filter_by_space(visible_notes(self.request.user), self.request, owner_field="user").select_related("user", "project")
         if self.request.query_params.get("q"):
             q = self.request.query_params["q"]
             queryset = queryset.filter(Q(title__icontains=q) | Q(content__icontains=q))
@@ -581,7 +602,8 @@ class ChatSessionListCreateView(generics.ListCreateAPIView):
     serializer_class = ChatSessionSerializer
 
     def get_queryset(self):
-        return visible_sessions(self.request.user).annotate(message_count=Count("messages"))
+        # Aggregation drops Meta.ordering, so order explicitly.
+        return visible_sessions(self.request.user).annotate(message_count=Count("messages")).order_by("-updated_at")
 
     def perform_create(self, serializer):
         project = serializer.validated_data.get("project")
@@ -699,8 +721,9 @@ class ChatStreamView(APIView):
                 message = turn.finish("".join(parts), status_info.provider)
                 finished = True
                 yield sse("done", {"message": ChatMessageSerializer(message).data})
-            except Exception as exc:  # pragma: no cover - network failures
-                yield sse("error", {"detail": str(exc)})
+            except Exception:  # pragma: no cover - network failures
+                logger.exception("Chat stream failed for session %s", turn.session.id)
+                yield sse("error", {"detail": "The answer was interrupted. Please try again."})
             finally:
                 # Keep partial answers if the client disconnects mid-stream.
                 if not finished and parts:
