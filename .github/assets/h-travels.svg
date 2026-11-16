@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 132" width="1200" height="132" role="img" aria-label="No. 02 — how a question travels">
+<style>
+@font-face{font-family:'NRP';src:url(data:font/woff2;base64,d09GMgABAAAAAAOAABAAAAAABoQAAAMlAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhwbgUQcKgZgP1NUQVRIAFwRCAqEHINFATYCJAMcCxAABCAFcgcgDAcbCQUgLgpsN2qDANEN4ybXIouNo/H/YTSe/2e/b/vcLyJpxOMssnlIidCIlESjQkjiT0M6KrPtgdKDIg/fzte/jxZogHGdNxkNcHchj8ZS/wPAFk53zv/Bm9x5PMD4C6UhvIcJB/qNE3tY/Pg8CjTAQAODzF2Pa/mI09lQK55+h2AMKCVKdHVFMHTBkdBCo5MhexU010JWG5oFWSWNtRBHEG0DfWVoiRTmSOEOmWqjbGkjpa0ruog2yg2Oe4GYNo0ANHwCEC1ROiI6Aigg5bTSkF8xJ9QdbEM7ZGgCOtQW0gHvZJEMKMcZpXGBlz0c+Ah9denZiNB+8QeBCuEIOMFE9BXWBFwQnrLyZgK/dDqSDKJtjaEK0QSoD12ryAICCi2sU3zLGvcaTPWVrhO27DmKVXfgerj54rrLLtlsckmNzmF2lx6YYoD34DMA2qBEKRHa6TyXlp+ajbtEpcUKpLlMG7bsmIP2HiVZyfvn7nTBsmOSo44Y0/bd84kNzNvmSkuPSo3erlbR0F3vPF41+upV9F+5Ijnq2jUauH49YtQV9F+VGn2dBq6FkRTFwLW80cGVC+a+stVaUv0LNaZtOyYpSeuvX+/6pX38K9aqsy9fTxu9V9/j2OM+GtivV8T5Lj5Vp/FEI+YeVpY32G6SIioluniEvPGJ/AJlhQmaGvqkvNDfYfzMZJO1vDIMDqoNH/L11pgcL8hXll+ooWkAhbl/iZt3W36+d6sM/P1KK9Sqt0n+Y4/wlmHDwps9oOYJW2A/D6v292mJj/frrQ+PDqnx922Nj/PtaYgIVPBPHN6ZaVEd6mARkDCirBhij8/zkHh/H3PjUC//IO9fOactUr0UXNRVBz5e0H2lcCEpMjbdudzXI9DOPMh23o/35tFG6Lk1UzTHuQEIUn9eO8cuTznvb+KMvQA+6cRFA3zVv/PdXfOp5jEOugqEm+zXv4BkTCEAYuiFI+9eZcyu0uGc++z88dBPBD0PDoxgU8dTTFICZcqUQTA2zVMIksGOluxr/rREJcq0qFagUZoSFcqUaxahWYFqFYokqlOjQC0GNLWG8Af6v/OxAAA=) format('woff2');font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:'NRP';src:url(data:font/woff2;base64,d09GMgABAAAAAAf4ABAAAAAADfwAAAedAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGhYbglocKgZgP1NUQVREAGQRCAqRXI4dATYCJANACyIABCAFXAcgDAcbAwtRlA7ScLIvDmxjWYNfwSFMNkx3E4fo2GnVMP5CgbdwgFvwPO3v/9feM1dz+OgvK8FKUmYGE5vyT2Bi+wmeATyt7N/t1E+WpkztdBBTTGzH7oTuzIE6iHnYCRAgkO/t/wmYV/bX2q/efryJN/F2IRIqtLQnuofJw0STeCMyPxGqmTYPhekkIqWRIrX4gp4lUmJLpQy+VxIBQgAUEUkcnAYcrfSgo8ZMmkW8dtHW9cRYgHdFjTXLNq8nDwUHLAVHxVHMRDaQokYS9iNyGoSMBIl/CyHnjRG44xk5HGDaxucrBr76b9mKUMBgyZKjgCMgoiXaEJJE2JcCptgqQMZpQB3OnA05LNcfS6DkHZ5Un220M6lsAItbLZYzMqDHnudjYjRo5sp8Suu1zoawqzGzxsEhjXbYAT4De9gf3EFVH0c3Mhx7raKhVJqqFd2xYuVWAf4X0mTVpHRfU6lEcgb6EDIB0dg/i3JtiETRlmnX3SFlWMMilrGKtWxgh7+CVpqvZ9OrzV/2Hb7Nt/hmfxK5Bor0IQlnkM7eCKqh32CeEsWvhL0qDYKmiueJtS2VXVzbsFVNWfvi4oqWsrqBtqx15dCeffdE2XBglAmPGd/7hCDwrKfghbTnuUcTUZC89xkH6nvOKg9PXBVgomJoSWw51txCPn5Bj5JntZ9dJh2jt/Yx8DuE/Azh0XSCdOxuK/kcmkBE+o13SSPtuT07TuI5wFOY0UB2BV2jpJobRGBu7YCnTEtzx4AlJ/tQ+8mu1qESsgraLoiJE0jzWT4wa86mXdQwSXO7LpzRM9LRjXRrBa+kjXb2MWYrQHb2k22tVfVs99A5QmhX1hL6DsKtsn/FIahkmnIJj6bJ0n2hZzxpmy5qP0WuHHxO2nMVYuw9gxaMXZD7HWuGSlu3xifW4xwL6TwdRXb2WVqe3ZmGz6rgbeUHouMIYHxYHuUqtI1RT5yIPT4gyk9ytFnV6HOPpitE4LVzqGFzZBd1MCr6ENAxIZ1YGnsdqPPymEJN1Gh2Ip411vaRnardzlQ434sWDC2JKzJO7t+E2ttWkjHRzbQ8DQMfENA2ThHbMWvwMto2dsto3UMk3p9l9LWd7Njycj/p2Cjp2DCTcvRAHvEwBwzhxSbYSpwhHyegW8nZm6W3VGoHbxf4GwxNhKizOyWyB09PbotFoYPWwbNjoMvsgQW2dIiOT5PoF4jEVtKxi70KPDv34iN72vnvBbtuuoCtFOTd0ArjVp8xvk5hVaI72SxRqyKNGrTeXBdvz8GUfEHUxEApI4xD32LIkTkRl1HOJX/d+FufDaeQ6goKZJfOg0gcUX0EEv91/ewmIPNjl03QHyRN17I2v0Zrw5JURYxaTJ+LClLl+B+N7yWJ5JIL/6vkqCPAkW4tMfqj3VyJKirJbJVno6+Tgl9rPXxQm1WIQxF3dwgrow5HWmLFYrXixdFzhfy1IAzGJ14Fkbi39l70k/ySeiOflbJ6HKHtC8z0X2k4BGcCZ5fiB2j0a/HxA3TaNdqPyXyqVv8UpMV91fYhxHnLemiVQ9VeCEKB1prxn294TJUTm68AZW1IY4IV5mEPey1pjs79sspd0cs8vFlbWpgJFQPr8NXjgUkrfGF6wvn3yQ8Tc9gjEjeun+NZw9eGJkRwBGrFi6PmC/l7eMsrgPywoWftrLy/5PJOBLH6J2EOnRuKA9T/cHo1OQIn2GhU3mJm5toc/pu4TKplrFpBrVCXRWXadeaQhKQ0+fkmA9H4cD4vSxP3ghT9+ccs5cjRg8LG3zf/vrYjJPI8tcGcran5BnTysiJLo+RCtTk6Vok4NVUxFrvBzP6kofFaEp33VI+LHJBDqdgDjK8eP+ykwMHYQqmvvj6IvVvqzul0UUk90nT1mt1wKrKZU2TejmX0c5k/0CDNxyClmOK7rL1KCQcmGwWgYpsOrb5RJ41QyTtj+DLWxijB60e0FN9V4BsfPpCjQoqS+nhAsZ0bLVapYpLFat4Th8A7hhET4hsHrPLgY5Gmcfc4DF/Lew6m+IVFqVXS3s3LrYz6z0TAPiu/JHx3WGaEUKBYHfV2Ib+jAKKUNUBxs87YHSNTh9iwNFO9bg+UCm9zvADBKaJjf3G+56rrI8eKtro/EwFvrTv3mxi+7MWnpdQ4uI2GsvhUu8KsFJhZWJC7dFt48G8G6H9vcJjimzDbD/rFkaV08GgviEz6nIuvDylSlNDLovybYHWqNiRdUYjkAZKoF9NUKlXBCpYWq7CVO/MEP3en2XrnQTgu4GvU93Hlo4/jAwqLkhxKV5COoLHDBR+74rRxmNqClL+Y7+bP/8qgL3gnRejb5vYXN7DqAwts/qEcnGxUMDOVkVRqWfJxWNJnwIb34R+wqt6lu4N0c+2UTq3Skcc//rcrPX8OK71UVpAM+pY35gvA8/rMHQCfG9/9MT/xbaYGJYv24H8PgvQ6gl5hrscvcNfpPRh0QEGuC7XS/6gL9ZXhdBQNfaGsP4q7or59nqTRdF/qLqPm6yL+rSo+tXq2ZqCypQ+D2AIXE0JmJhiFSIxgf8CWqjSerSxiLatYwtyfC1jByqoyI4MVbDsJi9jcGvA/e/raKQVF7+a337InAQAA) format('woff2');font-weight:400;font-style:italic;font-display:block}
+
+  .draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2s cubic-bezier(.65,0,.35,1) both; }
+  .fade { animation: fade 1.1s cubic-bezier(.2,.7,.2,1) both; }
+  .pop { transform-box: fill-box; transform-origin: center; animation: pop .8s cubic-bezier(.3,1.5,.5,1) both; }
+  .sway { transform-box: fill-box; transform-origin: 10% 100%; animation: sway 7s ease-in-out infinite alternate; }
+  .spin { transform-box: fill-box; transform-origin: center; animation: spin 24s linear infinite; }
+  .float { transform-box: fill-box; transform-origin: center; animation: float 6s ease-in-out infinite alternate; }
+  .drift1 { animation: drift1 18s ease-in-out infinite alternate; }
+  .drift2 { animation: drift2 22s ease-in-out infinite alternate; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes fade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { opacity: 0; transform: scale(.6) rotate(-8deg); } to { opacity: 1; transform: none; } }
+  @keyframes sway { from { transform: rotate(-2.5deg); } to { transform: rotate(2.5deg); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes float { from { transform: translateY(-4px) rotate(-1deg); } to { transform: translateY(5px) rotate(1.5deg); } }
+  @keyframes drift1 { to { transform: translate(40px, 18px); } }
+  @keyframes drift2 { to { transform: translate(-36px, -14px); } }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; }
+    .draw { stroke-dashoffset: 0; }
+  }
+
+  .num { font: 400 24px 'NRP','Playfair Display',Didot,Georgia,serif; fill: #C4553B; }
+  .tt { font: italic 400 50px 'NRP','Playfair Display',Didot,Georgia,serif; fill: #2B2622; }
+  .slide { animation: slide 1.1s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes slide { from { opacity: 0; transform: translateX(-24px) rotate(-1deg); } to { opacity: 1; transform: none; } }
+
+</style>
+<defs>
+  <filter id="graingNo02" x="0" y="0" width="100%" height="100%">
+    <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4" stitchTiles="stitch" result="n"/>
+    <feColorMatrix in="n" type="matrix" values="0 0 0 0 .32  0 0 0 0 .24  0 0 0 0 .16  0 0 0 -1.6 1.15"/>
+  </filter>
+  <filter id="brushgNo02" x="-25%" y="-25%" width="150%" height="150%">
+    <feTurbulence type="fractalNoise" baseFrequency=".035" numOctaves="2" seed="7" result="edge"/>
+    <feDisplacementMap in="SourceGraphic" in2="edge" scale="16" xChannelSelector="R" yChannelSelector="G" result="rough"/>
+    <feTurbulence type="fractalNoise" baseFrequency=".008 .16" numOctaves="3" seed="11" result="streak"/>
+    <feColorMatrix in="streak" type="matrix" values="0 0 0 0 1  0 0 0 0 .98  0 0 0 0 .94  .9 0 0 0 -.38" result="lt"/>
+    <feComposite in="lt" in2="rough" operator="in" result="ltIn"/>
+    <feMerge><feMergeNode in="rough"/><feMergeNode in="ltIn"/></feMerge>
+  </filter>
+  <filter id="softgNo02" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="26"/></filter>
+  <filter id="inkwobgNo02" x="-10%" y="-10%" width="120%" height="120%">
+    <feTurbulence type="fractalNoise" baseFrequency=".06" numOctaves="1" seed="2" result="w"/>
+    <feDisplacementMap in="SourceGraphic" in2="w" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter><clipPath id="labgNo02"><rect x="8" y="26" width="651" height="80" rx="14"/></clipPath></defs>
+<g class="slide"><g transform="rotate(-1.2 326 66)">
+  <rect x="8" y="26" width="651" height="80" rx="14" fill="#F5EEE3" stroke="#2B2622" stroke-width="1.3"/>
+  <g clip-path="url(#labgNo02)" opacity=".9"><path d="M676.8,94.4 C676.8,104.3 664.0,117.8 654.9,127.2 C645.8,136.5 633.3,150.7 622.1,150.6 C610.8,150.5 591.8,138.2 587.4,126.4 C583.1,114.7 589.5,92.4 596.1,80.1 C602.7,67.7 617.4,54.4 627.1,52.3 C636.8,50.2 646.2,60.6 654.4,67.6 C662.7,74.6 676.7,84.5 676.8,94.4Z" fill="#A6CCC8" opacity="1.0" filter="url(#brushgNo02)"><animate attributeName="d" dur="12s" repeatCount="indefinite" values="M676.8,94.4 C676.8,104.3 664.0,117.8 654.9,127.2 C645.8,136.5 633.3,150.7 622.1,150.6 C610.8,150.5 591.8,138.2 587.4,126.4 C583.1,114.7 589.5,92.4 596.1,80.1 C602.7,67.7 617.4,54.4 627.1,52.3 C636.8,50.2 646.2,60.6 654.4,67.6 C662.7,74.6 676.7,84.5 676.8,94.4Z;M676.6,91.0 C675.0,101.5 658.4,120.5 650.7,127.2 C643.1,133.8 640.6,132.8 630.8,131.0 C621.1,129.2 598.6,123.9 592.3,116.1 C585.9,108.4 587.2,94.2 592.6,84.2 C597.9,74.3 613.1,59.6 624.4,56.3 C635.8,53.0 651.9,58.8 660.6,64.6 C669.3,70.4 678.3,80.6 676.6,91.0Z;M671.6,95.6 C671.6,106.8 664.0,118.6 656.2,127.2 C648.4,135.7 634.4,149.6 624.8,146.9 C615.2,144.2 604.7,123.2 598.5,111.1 C592.3,98.9 582.4,83.9 587.8,74.1 C593.2,64.2 619.3,54.3 630.7,52.0 C642.1,49.6 649.5,52.7 656.3,60.0 C663.1,67.3 671.6,84.4 671.6,95.6Z;M676.8,94.4 C676.8,104.3 664.0,117.8 654.9,127.2 C645.8,136.5 633.3,150.7 622.1,150.6 C610.8,150.5 591.8,138.2 587.4,126.4 C583.1,114.7 589.5,92.4 596.1,80.1 C602.7,67.7 617.4,54.4 627.1,52.3 C636.8,50.2 646.2,60.6 654.4,67.6 C662.7,74.6 676.7,84.5 676.8,94.4Z" keyTimes="0;.33;.66;1" calcMode="spline" keySplines=".45 0 .55 1;.45 0 .55 1;.45 0 .55 1"/></path><rect width="1200" height="132" rx="0" filter="url(#graingNo02)" opacity=".3"/></g>
+  <text x="34" y="80" class="num">No. 02</text>
+  <text x="118" y="84" class="tt">how a question travels</text>
+  <path d="M116,96 C258,90 447,101 595,93" fill="none" stroke="#C4553B"
+        stroke-width="2.4" stroke-linecap="round" pathLength="1" class="draw" style="animation-delay:.6s" filter="url(#inkwobgNo02)"/>
+</g>
+<rect x="611.28125" y="14" width="74" height="24" fill="#E9D3A8" opacity=".72" transform="rotate(14 648.28125 26.0)"/>
+<rect x="-6" y="92" width="60" height="22" fill="#D9E2C8" opacity=".72" transform="rotate(-18 24.0 103.0)"/>
+</g>
+<g transform="translate(701.28125,70)"><g class="pop" style="animation-delay:0.90s"><g class="spin"><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(0.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(40.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(80.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(120.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(160.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(200.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(240.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(280.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><ellipse cx="0" cy="-10.4" rx="3.6" ry="8.3" transform="rotate(320.0)" fill="#FBF7F0" stroke="#2B2622" stroke-width="1.2"/><circle r="4.3" fill="#F1D68A" stroke="#2B2622" stroke-width="1.2"/><circle r="1.3" cx="-1.1" cy="-0.9" fill="#C4553B" opacity=".6"/></g></g></g>
+</svg>
