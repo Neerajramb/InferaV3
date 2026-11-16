@@ -111,4 +111,4 @@ frontend/src/
   hooks/        React Query data hooks
 ```
 
-<img src="./.github/assets/footer.svg" width="100%" alt="Infera · built slowly, with care — a solo build by Neeraj Ram B."/>
+<img src="./.github/assets/footer.svg" width="100%" alt="Infera · built slowly, with care — ask your documents, get answers that cite them."/>
